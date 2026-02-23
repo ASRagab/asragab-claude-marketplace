@@ -1,0 +1,12 @@
+{
+  "name": "cass",
+  "version": "0.1.0",
+  "description": "Cross-agent session search, context loading, analytics, and learning synthesis powered by CASS (Coding Agent Session Search)",
+  "author": {
+    "name": "ASRagab",
+    "url": "https://github.com/ASRagab"
+  },
+  "repository": "https://github.com/ASRagab/asragab-claude-marketplace",
+  "license": "MIT",
+  "keywords": ["cass", "session-search", "cross-agent", "analytics", "learnings"]
+}

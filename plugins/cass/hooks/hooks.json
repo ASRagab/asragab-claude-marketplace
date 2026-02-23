@@ -1,0 +1,16 @@
+{
+  "description": "CASS index freshness check on session start",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start-freshness.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "asragab-claude-marketplace",
+  "owner": {
+    "name": "ASRagab",
+    "url": "https://github.com/ASRagab"
+  },
+  "plugins": [
+    {
+      "name": "cass",
+      "source": "./plugins/cass",
+      "description": "Cross-agent session search, context, analytics, and learnings powered by CASS CLI",
+      "version": "0.1.0"
+    }
+  ]
+}

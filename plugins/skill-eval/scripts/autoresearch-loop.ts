@@ -239,20 +239,26 @@ Respond with JSON:
     .join("");
 
   const parsed = extractJson(text);
-  const answers = Array.isArray((parsed as any).answers) ? (parsed as any).answers : [];
-
-  const passed: string[] = [];
-  const failed: string[] = [];
+  const answers: Record<string, string | undefined>[] =
+    Array.isArray((parsed as Record<string, unknown>).answers)
+      ? (parsed as Record<string, unknown>).answers as Record<string, string | undefined>[]
+      : [];
 
   if (answers.length === 0) {
     return { passed: [], failed: questions.map(q => `${q} (no answer from judge)`), score: 0 };
   }
 
+  const passed: string[] = [];
+  const failed: string[] = [];
+
   for (const a of answers) {
-    if (a.answer.toLowerCase() === "yes") {
-      passed.push(a.question);
+    const answer = a.answer ?? a.verdict ?? "";
+    const question = a.question ?? "unknown";
+    const reason = a.reason ?? "";
+    if (String(answer).toLowerCase() === "yes") {
+      passed.push(question);
     } else {
-      failed.push(`${a.question} (${a.reason})`);
+      failed.push(`${question} (${reason})`);
     }
   }
 

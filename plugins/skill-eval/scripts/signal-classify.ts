@@ -61,10 +61,6 @@ function classifyNoise(event: ExtractedEvent): ClassificationLabel | null {
     if (NOISE_SYSTEM_SUBTYPES.has(event.subtype)) {
       return { category: "noise", subcategory: "system_meta", confidence: 1.0 };
     }
-    const content = contentToString(event.content).toLowerCase();
-    if (content.includes("system-reminder") || content.includes("ismeta")) {
-      return { category: "noise", subcategory: "system_meta", confidence: 0.9 };
-    }
   }
 
   return null;

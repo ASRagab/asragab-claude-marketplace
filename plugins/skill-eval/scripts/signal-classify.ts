@@ -492,7 +492,7 @@ async function main(): Promise<void> {
 
   let output = allClassified;
 
-  if (!includeNoise) {
+  if (!includeNoise && filterCategory !== "noise") {
     output = output.filter((e) => e.classification.category !== "noise");
   }
 

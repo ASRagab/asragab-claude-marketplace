@@ -11,6 +11,12 @@
       "source": "./plugins/cass",
       "description": "Cross-agent session search, context, analytics, and learnings powered by CASS CLI",
       "version": "0.1.0"
+    },
+    {
+      "name": "skill-eval",
+      "source": "./plugins/skill-eval",
+      "description": "Automated skill/prompt/tool evaluation and improvement via session log analysis, signal classification, LLM-as-judge targeting, and autoresearch optimization loops",
+      "version": "1.0.0"
     }
   ]
 }

@@ -239,14 +239,16 @@ Respond with JSON:
     .join("");
 
   const parsed = extractJson(text);
-  const result = parsed as {
-    answers: { question: string; answer: string; reason: string }[];
-  };
+  const answers = Array.isArray((parsed as any).answers) ? (parsed as any).answers : [];
 
   const passed: string[] = [];
   const failed: string[] = [];
 
-  for (const a of result.answers) {
+  if (answers.length === 0) {
+    return { passed: [], failed: questions.map(q => `${q} (no answer from judge)`), score: 0 };
+  }
+
+  for (const a of answers) {
     if (a.answer.toLowerCase() === "yes") {
       passed.push(a.question);
     } else {

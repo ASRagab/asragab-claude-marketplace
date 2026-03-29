@@ -133,17 +133,34 @@ Respond with ONLY a JSON object, no surrounding text:
 }
 
 function extractJson(text: string): Record<string, unknown> {
+  // Strip markdown code fences
+  const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "");
+
+  // Try direct parse first (covers clean responses)
+  try {
+    const trimmed = stripped.trim();
+    if (trimmed.startsWith("{")) return JSON.parse(trimmed);
+  } catch { /* fall through to brace scanner */ }
+
+  // Balanced-brace scanner, string-literal-aware
   let depth = 0;
   let start = -1;
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === "{") {
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < stripped.length; i++) {
+    const ch = stripped[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") {
       if (depth === 0) start = i;
       depth++;
-    } else if (text[i] === "}") {
+    } else if (ch === "}") {
       depth--;
       if (depth === 0 && start >= 0) {
         try {
-          return JSON.parse(text.slice(start, i + 1));
+          return JSON.parse(stripped.slice(start, i + 1));
         } catch {
           start = -1;
         }

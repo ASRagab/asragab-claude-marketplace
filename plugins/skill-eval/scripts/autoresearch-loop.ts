@@ -229,6 +229,7 @@ Respond with JSON:
   const response = await client.messages.create({
     model: ANTHROPIC_MODEL,
     max_tokens: 1024,
+    system: "You are a JSON-only responder. Always respond with a single valid JSON object. No markdown, no explanation, no code fences.",
     messages: [{ role: "user", content: prompt }],
   });
 

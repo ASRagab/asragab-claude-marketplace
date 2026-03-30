@@ -3,11 +3,11 @@
 import { parseArgs } from "util";
 import Anthropic from "@anthropic-ai/sdk";
 import type { ClassifiedEvent, ClassificationLabel, FrictionCluster, TargetAssessment, RankedTarget } from "./types";
-import { extractJson } from "./shared";
+import { extractJson, parseIntOrDie, readJsonl } from "./shared";
 
 const VALID_TARGET_TYPES = new Set(["skill", "prompt", "tool", "config", "workflow"]);
 
-function buildToolNameIndex(events: ClassifiedEvent[]): Map<string, string> {
+export function buildToolNameIndex(events: ClassifiedEvent[]): Map<string, string> {
   const index = new Map<string, string>();
   for (const e of events) {
     if (e.type === "tool_use") {
@@ -17,18 +17,18 @@ function buildToolNameIndex(events: ClassifiedEvent[]): Map<string, string> {
   return index;
 }
 
-function resolveToolName(
+export function resolveToolName(
   event: ClassifiedEvent,
   toolIndex: Map<string, string>,
 ): string | null {
-  if ((event as any).tool_name) return (event as any).tool_name;
+  if (event.type === "tool_use") return event.tool_name;
   if (event.type === "tool_result" && event.tool_use_id) {
     return toolIndex.get(event.tool_use_id) ?? null;
   }
   return null;
 }
 
-function clusterFriction(
+export function clusterFriction(
   events: ClassifiedEvent[],
   toolIndex: Map<string, string>,
 ): FrictionCluster[] {
@@ -102,7 +102,7 @@ Respond with ONLY a JSON object, no surrounding text:
 }`;
 }
 
-function validateAssessment(raw: Record<string, unknown>): TargetAssessment {
+export function validateAssessment(raw: Record<string, unknown>): TargetAssessment {
   const clamp = (v: unknown, lo: number, hi: number): number => {
     const n = typeof v === "number" ? v : parseInt(String(v), 10);
     if (isNaN(n)) return 3;
@@ -175,7 +175,7 @@ async function assessClustersParallel(
   return results;
 }
 
-function computeScore(
+export function computeScore(
   frequency: number,
   sessionCount: number,
   severity: number,
@@ -204,34 +204,6 @@ Options:
   process.stderr.write(help);
 }
 
-async function readInput(inputPath: string | null): Promise<ClassifiedEvent[]> {
-  let raw: string;
-  if (inputPath) {
-    raw = await Bun.file(inputPath).text();
-  } else {
-    const chunks: Buffer[] = [];
-    for await (const chunk of Bun.stdin.stream()) {
-      chunks.push(Buffer.from(chunk));
-    }
-    raw = Buffer.concat(chunks).toString("utf-8");
-  }
-
-  const events: ClassifiedEvent[] = [];
-  let skipped = 0;
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      events.push(JSON.parse(trimmed) as ClassifiedEvent);
-    } catch {
-      skipped++;
-    }
-  }
-  if (skipped > 0) {
-    process.stderr.write(`[warn] Skipped ${skipped} malformed input lines\n`);
-  }
-  return events;
-}
 
 async function main(): Promise<void> {
   const { values } = parseArgs({
@@ -255,14 +227,14 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  const minEvents = parseInt(values["min-events"]!, 10);
-  const topN = parseInt(values.top!, 10);
-  const concurrency = parseInt(values.concurrency!, 10);
+  const minEvents = parseIntOrDie(values["min-events"]!, "--min-events");
+  const topN = parseIntOrDie(values.top!, "--top");
+  const concurrency = parseIntOrDie(values.concurrency!, "--concurrency");
   const dryRun = values["dry-run"]!;
   const statsOnly = values.stats!;
   const model = values.model!;
 
-  const allEvents = await readInput(values.input ?? null);
+  const allEvents = await readJsonl<ClassifiedEvent>(values.input ?? null);
   const toolIndex = buildToolNameIndex(allEvents);
   const frictionEvents = allEvents.filter(
     (e) => e.classification.category === "friction",
@@ -350,7 +322,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(`Error: ${err.message}\n`);
-  process.exit(2);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    process.stderr.write(`Error: ${err.message}\n`);
+    process.exit(2);
+  });
+}

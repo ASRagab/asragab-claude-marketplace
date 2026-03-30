@@ -35,3 +35,36 @@ export function extractJson(text: string): Record<string, unknown> {
   }
   throw new Error("No valid JSON object found in response");
 }
+
+export function parseIntOrDie(value: string, name: string): number {
+  const n = parseInt(value, 10);
+  if (isNaN(n)) {
+    process.stderr.write(`Error: Invalid integer for ${name}: "${value}"\n`);
+    process.exit(1);
+  }
+  return n;
+}
+
+export async function readJsonl<T>(inputPath: string | null): Promise<T[]> {
+  let raw: string;
+  if (inputPath) {
+    const { readFileSync } = await import("node:fs");
+    raw = readFileSync(inputPath, "utf-8");
+  } else {
+    raw = await Bun.stdin.text();
+  }
+  const items: T[] = [];
+  let skipped = 0;
+  for (const line of raw.trim().split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      items.push(JSON.parse(line) as T);
+    } catch {
+      skipped++;
+    }
+  }
+  if (skipped > 0) {
+    process.stderr.write(`[warn] Skipped ${skipped} malformed input lines\n`);
+  }
+  return items;
+}

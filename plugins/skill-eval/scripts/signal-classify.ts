@@ -6,8 +6,9 @@ import type {
   ClassificationLabel,
   ClassifiedEvent,
 } from "./types";
+import { parseIntOrDie, readJsonl } from "./shared";
 
-function contentToString(content: unknown): string {
+export function contentToString(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
@@ -45,7 +46,7 @@ const NOISE_SYSTEM_SUBTYPES = new Set([
   "system-prompt",
 ]);
 
-interface Config {
+export interface Config {
   retryThreshold: number;
   longChainThreshold: number;
   retryWindowSize: number;
@@ -310,7 +311,7 @@ function classifyWindowed(
     ?? detectAbandoned(events, index, config);
 }
 
-function classifySession(
+export function classifySession(
   events: ExtractedEvent[],
   config: Config,
 ): ClassifiedEvent[] {
@@ -399,31 +400,6 @@ Options:
   process.stderr.write(help);
 }
 
-async function readInput(inputPath: string | null): Promise<ExtractedEvent[]> {
-  let raw: string;
-
-  if (inputPath) {
-    raw = await Bun.file(inputPath).text();
-  } else {
-    const chunks: Buffer[] = [];
-    for await (const chunk of Bun.stdin.stream()) {
-      chunks.push(Buffer.from(chunk));
-    }
-    raw = Buffer.concat(chunks).toString("utf-8");
-  }
-
-  const events: ExtractedEvent[] = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      events.push(JSON.parse(trimmed) as ExtractedEvent);
-    } catch {
-      // skip malformed lines
-    }
-  }
-  return events;
-}
 
 async function main(): Promise<void> {
   const { values } = parseArgs({
@@ -448,8 +424,8 @@ async function main(): Promise<void> {
   }
 
   const config: Config = {
-    retryThreshold: parseInt(values["retry-threshold"]!, 10),
-    longChainThreshold: parseInt(values["long-chain-threshold"]!, 10),
+    retryThreshold: parseIntOrDie(values["retry-threshold"]!, "--retry-threshold"),
+    longChainThreshold: parseIntOrDie(values["long-chain-threshold"]!, "--long-chain-threshold"),
     retryWindowSize: 5,
     abandonedLookback: 3,
   };
@@ -463,7 +439,7 @@ async function main(): Promise<void> {
   const includeNoise = values["include-noise"]!;
   const statsOnly = values.stats!;
 
-  const events = await readInput(values.input ?? null);
+  const events = await readJsonl<ExtractedEvent>(values.input ?? null);
 
   if (events.length === 0) {
     process.stderr.write("No events found in input.\n");
@@ -514,7 +490,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(`Error: ${err.message}\n`);
-  process.exit(2);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    process.stderr.write(`Error: ${err.message}\n`);
+    process.exit(2);
+  });
+}

@@ -1,22 +1,22 @@
 #!/usr/bin/env bun
 
 import { parseArgs } from "util";
-import { execSync } from "node:child_process";
-import { existsSync, readFileSync, appendFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, appendFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import type { RankedTarget, ExperimentConfig, ExperimentResult, ExperimentLine } from "./types";
-import { extractJson } from "./shared";
+import { extractJson, parseIntOrDie } from "./shared";
 
-function git(cmd: string, cwd: string): string | null {
+function git(args: string[], cwd: string): string | null {
   try {
-    return execSync(`git ${cmd}`, { cwd, encoding: "utf-8", timeout: 30000 }).trim();
+    return execFileSync("git", args, { cwd, encoding: "utf-8", timeout: 30000 }).trim();
   } catch {
     return null;
   }
 }
 
-function loadTargets(path: string): RankedTarget[] {
+export function loadTargets(path: string): RankedTarget[] {
   const raw = readFileSync(path, "utf-8");
   return raw
     .trim()
@@ -32,7 +32,7 @@ function loadTargets(path: string): RankedTarget[] {
     }, []);
 }
 
-function loadExperimentState(
+export function loadExperimentState(
   stateFile: string,
 ): { config: ExperimentConfig | null; results: ExperimentResult[]; bestScore: number } {
   if (!existsSync(stateFile)) return { config: null, results: [], bestScore: 0 };
@@ -248,7 +248,7 @@ async function runLoop(
         total_questions: totalQuestions,
         status: "crash",
         description: `Generation error: ${(err as Error).message}`,
-        commit: git("rev-parse --short=7 HEAD", workDir) ?? "unknown",
+        commit: git(["rev-parse", "--short=7", "HEAD"], workDir) ?? "unknown",
         timestamp: Math.floor(Date.now() / 1000),
       };
       appendFileSync(stateFile, JSON.stringify(crashResult) + "\n");
@@ -256,6 +256,7 @@ async function runLoop(
       consecutiveCrashes++;
       consecutiveDiscards = 0;
       if (consecutiveCrashes >= 3) { process.stderr.write("\n[done] 3 consecutive crashes — bailing out.\n"); break; }
+      continue;
     }
 
     process.stderr.write(`[run ${runNum}] Improvement: ${improvement.description}\n`);
@@ -275,7 +276,7 @@ async function runLoop(
         total_questions: totalQuestions,
         status: "crash",
         description: improvement.description,
-        commit: git("rev-parse --short=7 HEAD", workDir) ?? "unknown",
+        commit: git(["rev-parse", "--short=7", "HEAD"], workDir) ?? "unknown",
         timestamp: Math.floor(Date.now() / 1000),
       };
       appendFileSync(stateFile, JSON.stringify(crashResult) + "\n");
@@ -314,7 +315,7 @@ async function runLoop(
       total_questions: totalQuestions,
       status,
       description: improvement.description,
-      commit: git("rev-parse --short=7 HEAD", workDir) ?? "unknown",
+      commit: git(["rev-parse", "--short=7", "HEAD"], workDir) ?? "unknown",
       timestamp: Math.floor(Date.now() / 1000),
     };
 
@@ -402,7 +403,6 @@ async function main(): Promise<void> {
 
   if (values.summary) {
     // Show summary for all experiment files
-    const { readdirSync } = await import("node:fs");
     for (const f of readdirSync(stateDir)) {
       if (f.endsWith(".jsonl")) {
         process.stderr.write(`\n--- ${f} ---\n`);
@@ -419,8 +419,8 @@ async function main(): Promise<void> {
   }
 
   const targets = loadTargets(values.targets);
-  const targetRank = parseInt(values["target-rank"]!, 10);
-  const maxRounds = parseInt(values["max-rounds"]!, 10);
+  const targetRank = parseIntOrDie(values["target-rank"]!, "--target-rank");
+  const maxRounds = parseIntOrDie(values["max-rounds"]!, "--max-rounds");
 
   const target = targets.find((t) => t.rank === targetRank);
   if (!target) {
@@ -454,7 +454,9 @@ async function main(): Promise<void> {
   printSummary(stateFile);
 }
 
-main().catch((err) => {
-  process.stderr.write(`Error: ${err.message}\n`);
-  process.exit(2);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    process.stderr.write(`Error: ${err.message}\n`);
+    process.exit(2);
+  });
+}

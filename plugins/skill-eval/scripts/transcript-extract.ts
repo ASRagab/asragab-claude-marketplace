@@ -27,7 +27,7 @@ const DURATION_MULTIPLIERS: Record<string, number> = {
 };
 
 function printHelp(): void {
-  console.log(
+  process.stderr.write(
     [
       "Usage: bun scripts/transcript-extract.ts [options]",
       "",
@@ -39,7 +39,7 @@ function printHelp(): void {
       "  --output, -o <file>      Output file (default: stdout)",
       "  --format <format>        jsonl (default) or summary",
       "  --help                   Show help",
-    ].join("\n")
+    ].join("\n") + "\n"
   );
 }
 
@@ -360,7 +360,7 @@ function processTranscript(tf: TranscriptFile): ExtractedEvent[] {
       case "file-history-snapshot":
         break;
       default:
-        console.error(`[warn] Unknown message type "${(msg as any).type}" at ${tf.path}:${lineNum + 1}, skipping`);
+        process.stderr.write(`[warn] Unknown message type "${(msg as { type: string }).type}" at ${tf.path}:${lineNum + 1}, skipping\n`);
     }
   }
 
@@ -431,4 +431,6 @@ async function main() {
   }
 }
 
-main();
+if (import.meta.main) {
+  main();
+}

@@ -254,8 +254,8 @@ async function runLoop(
       appendFileSync(stateFile, JSON.stringify(crashResult) + "\n");
       results.push(crashResult);
       consecutiveCrashes++;
+      consecutiveDiscards = 0;
       if (consecutiveCrashes >= 3) { process.stderr.write("\n[done] 3 consecutive crashes — bailing out.\n"); break; }
-      continue;
     }
 
     process.stderr.write(`[run ${runNum}] Improvement: ${improvement.description}\n`);

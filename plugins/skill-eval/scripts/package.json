@@ -6,6 +6,6 @@
     "@types/bun": "^1.2.0"
   },
   "scripts": {
-    "check": "bun build --no-bundle --target=bun *.ts --outdir /dev/null 2>&1 || true; bunx tsc --noEmit"
+    "check": "bunx tsc --noEmit"
   }
 }

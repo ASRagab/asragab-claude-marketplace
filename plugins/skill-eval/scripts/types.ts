@@ -197,3 +197,58 @@ export interface ClassificationLabel {
 export type ClassifiedEvent = ExtractedEvent & {
   classification: ClassificationLabel;
 };
+
+export interface FrictionCluster {
+  key: string;
+  subcategory: string;
+  tool_name: string | null;
+  events: ClassifiedEvent[];
+  session_count: number;
+  representative_evidence: string[];
+}
+
+export interface TargetAssessment {
+  root_cause: string;
+  target_type: "skill" | "prompt" | "tool" | "config" | "workflow";
+  target_path: string | null;
+  severity: number;
+  improvability: number;
+  suggested_action: string;
+  eval_questions: string[];
+}
+
+export interface RankedTarget {
+  rank: number;
+  cluster_key: string;
+  subcategory: string;
+  tool_name: string | null;
+  frequency: number;
+  session_count: number;
+  score: number;
+  assessment: TargetAssessment;
+  evidence_sample: string[];
+}
+
+export interface ExperimentConfig {
+  type: "config";
+  target_key: string;
+  target_type: string;
+  eval_questions: string[];
+  suggested_action: string;
+  timestamp: number;
+}
+
+export interface ExperimentResult {
+  type: "result";
+  run: number;
+  score: number;
+  passed: string[];
+  failed: string[];
+  total_questions: number;
+  status: "keep" | "discard" | "crash";
+  description: string;
+  commit: string;
+  timestamp: number;
+}
+
+export type ExperimentLine = ExperimentConfig | ExperimentResult;

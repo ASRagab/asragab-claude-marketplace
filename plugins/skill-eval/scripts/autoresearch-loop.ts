@@ -5,52 +5,8 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync, appendFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
-
-interface RankedTarget {
-  rank: number;
-  cluster_key: string;
-  subcategory: string;
-  tool_name: string | null;
-  frequency: number;
-  session_count: number;
-  score: number;
-  assessment: {
-    root_cause: string;
-    target_type: "skill" | "prompt" | "tool" | "config" | "workflow";
-    target_path: string | null;
-    severity: number;
-    improvability: number;
-    suggested_action: string;
-    eval_questions: string[];
-  };
-  evidence_sample: string[];
-}
-
-interface ExperimentConfig {
-  type: "config";
-  target_key: string;
-  target_type: string;
-  eval_questions: string[];
-  suggested_action: string;
-  timestamp: number;
-}
-
-interface ExperimentResult {
-  type: "result";
-  run: number;
-  score: number;
-  passed: string[];
-  failed: string[];
-  total_questions: number;
-  status: "keep" | "discard" | "crash";
-  description: string;
-  commit: string;
-  timestamp: number;
-}
-
-type ExperimentLine = ExperimentConfig | ExperimentResult;
-
-const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+import type { RankedTarget, ExperimentConfig, ExperimentResult, ExperimentLine } from "./types";
+import { extractJson } from "./shared";
 
 function git(cmd: string, cwd: string): string | null {
   try {
@@ -58,44 +14,6 @@ function git(cmd: string, cwd: string): string | null {
   } catch {
     return null;
   }
-}
-
-function extractJson(text: string): Record<string, unknown> {
-  // Strip markdown code fences
-  const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "");
-
-  // Try direct parse first (covers clean responses)
-  try {
-    const trimmed = stripped.trim();
-    if (trimmed.startsWith("{")) return JSON.parse(trimmed);
-  } catch { /* fall through to brace scanner */ }
-
-  // Balanced-brace scanner, string-literal-aware
-  let depth = 0;
-  let start = -1;
-  let inString = false;
-  let escape = false;
-  for (let i = 0; i < stripped.length; i++) {
-    const ch = stripped[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === "{") {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (ch === "}") {
-      depth--;
-      if (depth === 0 && start >= 0) {
-        try {
-          return JSON.parse(stripped.slice(start, i + 1));
-        } catch {
-          start = -1;
-        }
-      }
-    }
-  }
-  throw new Error("No valid JSON object found in response");
 }
 
 function loadTargets(path: string): RankedTarget[] {
@@ -148,6 +66,7 @@ async function generateImprovement(
   client: Anthropic,
   target: RankedTarget,
   previousAttempts: ExperimentResult[],
+  model: string,
 ): Promise<{ description: string; patch: string }> {
   const attemptsContext =
     previousAttempts.length > 0
@@ -182,7 +101,7 @@ Respond with JSON:
 }`;
 
   const response = await client.messages.create({
-    model: ANTHROPIC_MODEL,
+    model,
     max_tokens: 2048,
     system: "You are a JSON-only responder. Always respond with a single valid JSON object. No markdown, no explanation, no code fences. The patch field must be a single string with newlines escaped as \\n.",
     messages: [{ role: "user", content: prompt }],
@@ -201,6 +120,7 @@ async function evaluateImprovement(
   client: Anthropic,
   target: RankedTarget,
   improvement: { description: string; patch: string },
+  model: string,
 ): Promise<{ passed: string[]; failed: string[]; score: number }> {
   const questions = target.assessment.eval_questions;
 
@@ -227,7 +147,7 @@ Respond with JSON:
 }`;
 
   const response = await client.messages.create({
-    model: ANTHROPIC_MODEL,
+    model,
     max_tokens: 1024,
     system: "You are a JSON-only responder. Always respond with a single valid JSON object. No markdown, no explanation, no code fences.",
     messages: [{ role: "user", content: prompt }],
@@ -270,6 +190,7 @@ async function runLoop(
   workDir: string,
   maxRounds: number,
   stateFile: string,
+  model: string,
 ): Promise<void> {
   const client = new Anthropic({ maxRetries: 3 });
 
@@ -294,8 +215,20 @@ async function runLoop(
   }
 
   const totalQuestions = target.assessment.eval_questions.length;
+
+  // Compute trailing streaks from loaded state so resumption respects
+  // the plateau/crash bailout thresholds correctly.
   let consecutiveDiscards = 0;
+  for (let i = results.length - 1; i >= 0; i--) {
+    if (results[i].status === "discard") consecutiveDiscards++;
+    else break;
+  }
+
   let consecutiveCrashes = 0;
+  for (let i = results.length - 1; i >= 0; i--) {
+    if (results[i].status === "crash") consecutiveCrashes++;
+    else break;
+  }
 
   for (let round = 0; round < maxRounds; round++) {
     const runNum = startRun + round + 1;
@@ -303,7 +236,7 @@ async function runLoop(
 
     let improvement: { description: string; patch: string };
     try {
-      improvement = await generateImprovement(client, target, results.slice(-5));
+      improvement = await generateImprovement(client, target, results.slice(-5), model);
     } catch (err) {
       process.stderr.write(`[run ${runNum}] CRASH generating improvement: ${(err as Error).message}\n`);
       const crashResult: ExperimentResult = {
@@ -330,7 +263,7 @@ async function runLoop(
 
     let evalResult: { passed: string[]; failed: string[]; score: number };
     try {
-      evalResult = await evaluateImprovement(client, target, improvement);
+      evalResult = await evaluateImprovement(client, target, improvement, model);
     } catch (err) {
       process.stderr.write(`[run ${runNum}] CRASH evaluating: ${(err as Error).message}\n`);
       const crashResult: ExperimentResult = {
@@ -436,6 +369,7 @@ Options:
   --target-rank <n>       Which target to optimize (default: 1 = highest ranked)
   --max-rounds <n>        Max improvement rounds (default: 10)
   --state-dir <dir>       Directory for experiment state (default: ./experiments)
+  --model <model>         Anthropic model for generation and eval (default: claude-haiku-4-5-20251001)
   --summary               Print summary of existing experiments
   --dry-run               Show what would be optimized without running
   --help                  Show this help
@@ -450,6 +384,7 @@ async function main(): Promise<void> {
       "target-rank": { type: "string", default: "1" },
       "max-rounds": { type: "string", default: "10" },
       "state-dir": { type: "string", default: "./experiments" },
+      model: { type: "string", default: "claude-haiku-4-5-20251001" },
       summary: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
       help: { type: "boolean", default: false },
@@ -515,7 +450,7 @@ async function main(): Promise<void> {
   process.stderr.write(`Score: ${target.score} (freq=${target.frequency}, sessions=${target.session_count})\n`);
   process.stderr.write(`Rounds: up to ${maxRounds}\n\n`);
 
-  await runLoop(target, workDir, maxRounds, stateFile);
+  await runLoop(target, workDir, maxRounds, stateFile, values.model!);
   printSummary(stateFile);
 }
 

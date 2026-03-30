@@ -2,38 +2,8 @@
 
 import { parseArgs } from "util";
 import Anthropic from "@anthropic-ai/sdk";
-import type { ClassifiedEvent, ClassificationLabel } from "./types";
-
-interface FrictionCluster {
-  key: string;
-  subcategory: string;
-  tool_name: string | null;
-  events: ClassifiedEvent[];
-  session_count: number;
-  representative_evidence: string[];
-}
-
-interface TargetAssessment {
-  root_cause: string;
-  target_type: "skill" | "prompt" | "tool" | "config" | "workflow";
-  target_path: string | null;
-  severity: number;
-  improvability: number;
-  suggested_action: string;
-  eval_questions: string[];
-}
-
-interface RankedTarget {
-  rank: number;
-  cluster_key: string;
-  subcategory: string;
-  tool_name: string | null;
-  frequency: number;
-  session_count: number;
-  score: number;
-  assessment: TargetAssessment;
-  evidence_sample: string[];
-}
+import type { ClassifiedEvent, ClassificationLabel, FrictionCluster, TargetAssessment, RankedTarget } from "./types";
+import { extractJson } from "./shared";
 
 const VALID_TARGET_TYPES = new Set(["skill", "prompt", "tool", "config", "workflow"]);
 
@@ -130,44 +100,6 @@ Respond with ONLY a JSON object, no surrounding text:
   "suggested_action": "...",
   "eval_questions": ["Does ...?", "Does ...?", "Does ...?"]
 }`;
-}
-
-function extractJson(text: string): Record<string, unknown> {
-  // Strip markdown code fences
-  const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "");
-
-  // Try direct parse first (covers clean responses)
-  try {
-    const trimmed = stripped.trim();
-    if (trimmed.startsWith("{")) return JSON.parse(trimmed);
-  } catch { /* fall through to brace scanner */ }
-
-  // Balanced-brace scanner, string-literal-aware
-  let depth = 0;
-  let start = -1;
-  let inString = false;
-  let escape = false;
-  for (let i = 0; i < stripped.length; i++) {
-    const ch = stripped[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === "{") {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (ch === "}") {
-      depth--;
-      if (depth === 0 && start >= 0) {
-        try {
-          return JSON.parse(stripped.slice(start, i + 1));
-        } catch {
-          start = -1;
-        }
-      }
-    }
-  }
-  throw new Error("No valid JSON object found in response");
 }
 
 function validateAssessment(raw: Record<string, unknown>): TargetAssessment {

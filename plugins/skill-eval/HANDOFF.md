@@ -1,6 +1,6 @@
 # skill-eval: Agent Handoff Document
 
-> Written 2026-03-28. Covers the complete build-out of M1–M4 and plugin packaging.
+> Written 2026-03-28, updated 2026-03-30. Covers the complete build-out of M1–M4, plugin packaging, and distribution cleanup.
 > Intended audience: any agent (or human) picking up this project cold.
 
 ## What This Is
@@ -143,11 +143,11 @@ Each milestone has been tested individually and the pipeline has been run end-to
 
 ## Architecture Notes for the Next Agent
 
-- **Type system**: All interfaces are in `scripts/types.ts`. The discriminated unions (`ExtractedEvent`, `RawContentBlock`) use a `type` field. Follow this pattern for any new event types.
+- **Type system**: All shared interfaces are in `scripts/types.ts`, including event types, classification types, target/experiment types. The discriminated unions (`ExtractedEvent`, `RawContentBlock`) use a `type` field. Follow this pattern for any new event types.
 - **JSONL everywhere**: Every stage reads and writes newline-delimited JSON. One record per line. This is deliberate — it enables streaming, `wc -l` for counts, `head`/`tail` for sampling, and `jq` for ad-hoc queries.
 - **Anthropic SDK**: M3 and M4 use `@anthropic-ai/sdk` directly (not via Claude Code's /zo/ask or --print). This is simpler, cheaper, and gives full control over system messages and temperature.
-- **The `extractJson()` function** in both M3 and M4 is the same implementation — it's duplicated, not shared. If you fix a bug in one, fix it in the other. (Or extract it to a shared util, which would be better.)
-- **Model selection**: M3 and M4 default to `claude-haiku-3-5-sonnet` via `--model` flag. The model string is passed directly to the Anthropic SDK. Any model available on the API works.
+- **The `extractJson()` function** lives in `scripts/shared.ts` and is imported by both M3 and M4.
+- **Model selection**: M3 and M4 default to `claude-haiku-4-5-20251001` via `--model` flag. The model string is passed directly to the Anthropic SDK. Any model available on the API works.
 
 ## Quick Reference: File → Responsibility
 
@@ -158,4 +158,5 @@ Each milestone has been tested individually and the pipeline has been run end-to
 | `target-identify.ts` | LLM-as-judge clustering + target ranking |
 | `autoresearch-loop.ts` | Generate → eval → keep/discard optimization loop |
 | `types.ts` | All TypeScript interfaces (events, classification, targets, experiments) |
+| `shared.ts` | Shared utilities (extractJson parser) |
 | `MILESTONES.md` | Canonical task tracker — the remaining checkboxes are the remaining work |

@@ -200,6 +200,8 @@ Three issues were identified and resolved to make the eval loop reliable:
 
 3. **Improved eval questions from M3** — Refined the eval criteria to be unambiguous binary yes/no questions. Vague or compound questions caused inconsistent judge verdicts.
 
+4. **Trailing streak computation on resume** — When resuming a loop from a persisted state file, the `consecutiveDiscards` and `consecutiveCrashes` counters were reset to 0 instead of being computed from the trailing streak in the loaded results. This meant resuming a run that had already plateaued (e.g., 4 consecutive discards) would not trigger the bailout threshold until 5 more discards occurred.
+
 ### Results
 - **`long_chain:mcp__zo__run_bash_command`** (prompt target): Perfect 5/5 on round 1. Kept.
 - **`tool_error`** (tool target): Scored 3/4, 2/4, 3/4, then 4/4 on round 4. The loop correctly kept improvements and discarded regressions.
@@ -217,9 +219,10 @@ Three issues were identified and resolved to make the eval loop reliable:
 - [x] Plugin registered in marketplace.json
 
 ### Dependencies
-- [ ] CASS CLI (optional — can parse raw transcripts if CASS not installed)
-- [ ] Anthropic API key (for LLM-as-judge in M3 and eval in M4)
-- [ ] Git (for autoresearch keep/revert in M4)
+- CASS CLI (optional — can parse raw transcripts if CASS not installed)
+- `ANTHROPIC_API_KEY` environment variable (required for LLM-as-judge in M3 and eval in M4)
+- Git (for autoresearch keep/revert in M4)
+- Bun runtime
 
 ### Data Flow
 ```

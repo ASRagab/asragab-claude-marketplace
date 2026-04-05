@@ -5,9 +5,10 @@ description: >-
   "past mistakes with", "synthesize learnings", "what went wrong with",
   "recurring issues", "patterns from history", "extract knowledge from sessions",
   "self-improvement from past", "what keeps failing", "common errors",
+  "tool usage patterns", "which agent is best for",
   or wants to extract patterns, recurring issues, and actionable lessons
   from past coding agent sessions for self-improvement.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Session Learnings
@@ -28,9 +29,42 @@ cass search "error fix bug" --mode hybrid --json --limit 20 --fields summary
 
 # Search for specific problem domains
 cass search "<topic> problem issue" --mode hybrid --json --limit 15
+
+# Time-scoped search
+cass search "error" --days 30 --json --fields summary --limit 20
 ```
 
-### 2. Gather Evidence
+### 2. Quick Pattern Scan via Aggregation
+
+Before diving into individual sessions, get an overview:
+
+```bash
+# Error distribution by agent
+cass search "error fix bug" --json --aggregate agent --days 30
+
+# Error distribution over time
+cass search "error" --json --aggregate date --days 30
+
+# Topic frequency by workspace
+cass search "<topic>" --json --aggregate workspace
+```
+
+### 3. Tool Usage Analysis
+
+Identify which tools are used most and their efficiency:
+
+```bash
+# Top tools by usage
+cass analytics tools --limit 20 --json
+
+# Tools for a specific agent
+cass analytics tools --agent claude_code --limit 10 --json
+
+# Recent tool patterns
+cass analytics tools --days 7 --json
+```
+
+### 4. Gather Evidence
 
 Expand relevant sessions to understand the full context:
 
@@ -42,7 +76,7 @@ cass expand <source_path> --line <line_number> -C 10 --json
 cass context <source_path> --json --limit 5
 ```
 
-### 3. Synthesize Patterns
+### 5. Synthesize Patterns
 
 After gathering evidence from multiple sessions, identify:
 
@@ -50,8 +84,9 @@ After gathering evidence from multiple sessions, identify:
 - **Successful patterns**: Approaches that consistently worked.
 - **Evolution**: How solutions improved over time.
 - **Anti-patterns**: Approaches that were tried and abandoned.
+- **Tool efficiency**: Which tools deliver results vs. waste tokens.
 
-### 4. Store Learnings
+### 6. Store Learnings
 
 Invoke the `mcp__memory__remember` MCP tool to store each synthesized learning individually:
 
@@ -70,8 +105,11 @@ Before storing, recall existing memories on the topic to avoid duplicates.
 Find recurring errors and their resolutions:
 
 ```bash
-# Search for error-related sessions
-cass search "error failed exception crash" --mode hybrid --json --limit 20
+# Aggregate errors by agent to find where problems concentrate
+cass search "error failed exception crash" --json --aggregate agent --days 30
+
+# Then drill into specific agents
+cass search "error failed" --agent claude_code --mode hybrid --json --limit 20
 
 # Search for specific error types
 cass search "TypeError undefined null" --json --limit 10
@@ -116,15 +154,37 @@ Extract:
 Compare how different agents handled similar problems:
 
 ```bash
-# Same topic, different agents
+# Aggregate by agent for a topic
+cass search "<topic>" --json --aggregate agent
+
+# Then drill into specific agents
 cass search "<topic>" --agent claude_code --json --limit 5
 cass search "<topic>" --agent codex --json --limit 5
 cass search "<topic>" --agent gemini --json --limit 5
+
+# Compare model usage across agents
+cass analytics models --json
 ```
 
 Extract:
 - Which agent performed best for which task type
 - Complementary strengths across agents
+
+### Token Efficiency Analysis
+
+Understand token consumption patterns:
+
+```bash
+# Token usage trends
+cass analytics tokens --days 30 --group-by day --json
+
+# Which tools consume the most tokens
+cass analytics tools --limit 10 --json
+```
+
+Extract:
+- High-token-cost operations to optimize
+- Efficient vs. wasteful patterns
 
 ## Output Structure
 
@@ -139,6 +199,8 @@ When presenting learnings, structure as:
 ## Best Practices
 
 - Mine errors first — they contain the highest-value lessons.
+- Use `--aggregate` for fast pattern scanning before reading individual sessions.
+- Use `cass analytics tools` to identify tool-related patterns.
 - Use hybrid search mode for conceptual queries about patterns.
 - Always expand sessions to get full context before synthesizing.
 - Store every distinct learning to memory individually, not as bulk summaries.
@@ -147,6 +209,4 @@ When presenting learnings, structure as:
 
 ## Additional Resources
 
-### Reference Files
-
-- **`references/command-reference.md`** - Complete CASS CLI reference with all flags and options
+- **[Command Reference](../../references/command-reference.md)** - Complete CASS CLI v0.2.7 reference

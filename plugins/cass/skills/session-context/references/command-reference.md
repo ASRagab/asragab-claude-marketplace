@@ -1,1 +1,0 @@
-../../session-search/references/command-reference.md

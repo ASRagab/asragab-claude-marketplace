@@ -5,32 +5,124 @@ description: >-
   "show coding patterns", "session timeline", "activity summary",
   "how much have I used", "agent usage stats", "session statistics",
   "what agents do I use most", "show my activity", "productivity report",
-  "usage dashboard", or wants to understand their coding agent usage patterns,
-  activity trends, and session statistics.
-version: 0.1.0
+  "usage dashboard", "token usage", "tool usage stats", "model usage",
+  "cost analysis", "analytics health",
+  or wants to understand their coding agent usage patterns,
+  activity trends, token consumption, and session statistics.
+version: 0.2.0
 ---
 
 # Session Analytics
 
 Analyze coding agent session history for usage patterns, activity trends,
-and productivity insights. Uses CASS stats, timeline, and search to provide
-data-driven analysis of how coding agents are being used.
+token consumption, and productivity insights. Uses the CASS analytics engine
+for deep analysis across all indexed coding agents.
 
-## Core Commands
+## Analytics Engine
+
+CASS v0.2.7 includes a dedicated analytics subsystem with six subcommands.
+All share common flags: `--since`, `--until`, `--days`, `--agent`, `--workspace`, `--source`, `--json`.
+
+All JSON responses use an envelope: `{ "command": "analytics/<sub>", "data": {...}, "_meta": {...} }`
+
+### Analytics Health
+
+Check analytics data coverage and integrity:
+
+```bash
+cass analytics status --json
+```
+
+Key fields in response:
+- `data.tables` - Row counts and freshness per rollup table
+- `data.coverage` - Total messages, API token coverage %, estimate-only %
+- `data.drift` - Signals of data inconsistency
+- `data.recommended_action` - What to do next
+
+### Token Usage
+
+Analyze token consumption over time:
+
+```bash
+# Last 7 days by day
+cass analytics tokens --days 7 --group-by day --json
+
+# Last month by week
+cass analytics tokens --days 30 --group-by week --json
+
+# By hour for today
+cass analytics tokens --days 1 --group-by hour --json
+
+# Filtered to specific agent
+cass analytics tokens --days 7 --agent claude_code --json
+```
+
+Response includes per-bucket:
+- `counts` - message_count, user/assistant counts, tool_call_count
+- `api_tokens` - total, input, output, cache_read, cache_creation, thinking
+- `derived` - api_coverage_pct, avg_api_per_message, avg_content_per_message
+
+### Tool Usage
+
+Identify most-used tools and their efficiency:
+
+```bash
+# Top 20 tools
+cass analytics tools --limit 20 --json
+
+# Top tools for a specific agent
+cass analytics tools --agent claude_code --limit 10 --json
+
+# Tools used in last 7 days
+cass analytics tools --days 7 --json
+```
+
+Response fields per row: tool name, tool_call_count, message_count, api_tokens_total,
+tool_calls_per_1k_api_tokens, tool_calls_per_1k_content_tokens.
+
+### Model Usage
+
+See which models are being used:
+
+```bash
+cass analytics models --json
+
+# Models used by specific agent
+cass analytics models --agent claude_code --json
+```
+
+Available for connectors that report model names (claude_code, codex, pi_agent, factory, opencode, cursor).
+
+### Data Repair
+
+Rebuild or validate analytics data:
+
+```bash
+# Validate data integrity
+cass analytics validate --json
+
+# Auto-fix safe issues
+cass analytics validate --fix --json
+
+# Force rebuild all rollup tables
+cass analytics rebuild --force --json
+```
+
+## Supplementary Commands
 
 ### Index Statistics
 
-Get an overview of all indexed data:
+Quick overview of indexed data:
 
 ```bash
 cass stats --json
 ```
 
-Returns: total conversations, messages, breakdown by agent, workspace stats.
+Returns: total conversations, messages, per-agent breakdown, top workspaces, date range.
 
 ### Timeline Analysis
 
-Visualize activity over time periods:
+Visualize activity over time:
 
 ```bash
 # Today's activity by hour
@@ -41,79 +133,69 @@ cass timeline --since 7d --json --group-by day
 
 # Past month by day
 cass timeline --since 30d --json --group-by day
-
-# Specific agent activity
-cass timeline --since 30d --agent claude_code --json --group-by day
 ```
 
-### Health & Freshness
+### Aggregation Queries
 
-Check index health and coverage:
+Fast counts via search aggregation (~99% token reduction):
 
 ```bash
-cass health --json
+# Sessions by agent
+cass search "*" --json --aggregate agent
+
+# Sessions by agent and workspace
+cass search "*" --json --aggregate agent,workspace --days 30
+
+# Error distribution by agent
+cass search "error" --json --aggregate agent --week
 ```
 
 ## Analysis Workflows
 
-### Agent Usage Breakdown
-
-1. Run `cass stats --json` to get per-agent conversation counts.
-2. Calculate percentages and identify primary vs. secondary agents.
-3. Correlate with project types if workspace data is available.
-
-### Activity Patterns
-
-1. Run `cass timeline --since 30d --json --group-by day` for daily trends.
-2. Identify peak days, quiet periods, and patterns.
-3. Run `cass timeline --since 7d --json --group-by hour` for hourly patterns.
-
-### Topic Analysis
-
-Search for recurring themes across sessions:
+### Quick Health Check
 
 ```bash
-# Find sessions about specific topics
-cass search "debugging" --json --fields summary --limit 20
-cass search "refactoring" --json --fields summary --limit 20
-cass search "architecture" --json --fields summary --limit 20
+cass analytics status --json
+cass health --json
 ```
 
-### Cross-Agent Comparison
+### Weekly Report
 
-Compare how different agents are used:
+1. `cass analytics tokens --days 7 --group-by day --json` - daily token consumption
+2. `cass analytics tools --days 7 --limit 10 --json` - top tools used
+3. `cass search "*" --json --aggregate agent --week` - agent distribution
+4. `cass timeline --since 7d --json --group-by day` - activity timeline
+
+### Agent Comparison
 
 ```bash
-# Claude Code sessions
-cass search "*" --agent claude_code --json --fields minimal --limit 50
+# Token usage by agent
+cass analytics tokens --days 30 --agent claude_code --json
+cass analytics tokens --days 30 --agent codex --json
 
-# Codex sessions
-cass search "*" --agent codex --json --fields minimal --limit 50
+# Tool usage by agent
+cass analytics tools --agent claude_code --limit 10 --json
+cass analytics tools --agent codex --limit 10 --json
 ```
+
+### Coverage & Uncertainty
+
+- `api_token_coverage_pct`: % of messages with API token data (from Claude, Codex)
+- `estimate_only_pct`: % using content-estimated tokens (chars/4 heuristic)
+- When coverage is low, derived metrics are estimates, not ground truth
+- Content token estimates are always available; API tokens are sparse
 
 ## Presenting Results
 
-When presenting analytics, structure the output as:
+Structure analytics output as:
 
-1. **Summary**: Total sessions, active agents, time range covered.
-2. **Agent Distribution**: Which agents are used and how often.
-3. **Activity Trends**: Daily/weekly patterns, peak usage periods.
-4. **Topic Clusters**: Common themes across sessions.
-5. **Recommendations**: Insights based on the data (e.g., underused agents, recurring problems).
-
-## Storing Insights
-
-After generating analytics, invoke the `mcp__memory__remember` MCP tool to store key findings:
-
-- **title**: Session analytics summary (`<date range>`)
-- **content**: Key stats, patterns, and insights discovered
-- **tags**: `["cass", "session-analytics", "insights"]`
-- **category**: `"context"`
-
-Before storing, recall existing memories on the topic to avoid duplicates.
+1. **Summary**: Total sessions, active agents, time range, data coverage %
+2. **Token Consumption**: Daily/weekly trends, total input/output/cache
+3. **Agent Distribution**: Which agents used and how often
+4. **Tool Patterns**: Most-used tools, efficiency metrics
+5. **Model Usage**: Which models, where available
+6. **Recommendations**: Insights based on the data
 
 ## Additional Resources
 
-### Reference Files
-
-- **`references/command-reference.md`** - Complete CASS CLI reference with all flags and options
+- **[Command Reference](../../references/command-reference.md)** - Complete CASS CLI v0.2.7 reference

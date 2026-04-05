@@ -9,27 +9,5 @@
   "repository": "https://github.com/ASRagab/asragab-claude-marketplace",
   "license": "MIT",
   "keywords": ["skill-eval", "autoresearch", "evals", "optimization", "llm-as-judge", "session-analysis"],
-  "compatibility": "Claude Code with Bun runtime",
-  "skills": [
-    {
-      "name": "transcript-extract",
-      "path": "skills/transcript-extract/SKILL.md",
-      "entrypoint": "scripts/transcript-extract.ts"
-    },
-    {
-      "name": "signal-classify",
-      "path": "skills/signal-classify/SKILL.md",
-      "entrypoint": "scripts/signal-classify.ts"
-    },
-    {
-      "name": "target-identify",
-      "path": "skills/target-identify/SKILL.md",
-      "entrypoint": "scripts/target-identify.ts"
-    },
-    {
-      "name": "autoresearch-loop",
-      "path": "skills/autoresearch-loop/SKILL.md",
-      "entrypoint": "scripts/autoresearch-loop.ts"
-    }
-  ]
+  "compatibility": "Claude Code with Bun runtime"
 }

@@ -5,17 +5,18 @@ description: >-
   "find where I solved", "how did I fix", "recall previous solution",
   "search agent history", "find in coding history", "what did I do about",
   "search across agents", "grep my sessions", "look up past conversation",
+  "aggregate session data", "count sessions by agent",
   or needs to locate past solutions, decisions, or code patterns from
   previous coding agent sessions (Claude Code, Codex, Cursor, Gemini CLI,
   and others).
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Session Search
 
 Search across all indexed coding agent sessions using CASS (Coding Agent Session Search).
-Supports lexical (BM25), semantic (vector), and hybrid search modes across 2,600+ conversations
-from Claude Code, Codex, Cursor, Gemini CLI, and other agents.
+Supports lexical (BM25), semantic (vector), and hybrid search modes across conversations
+from Claude Code, Codex, Cursor, Gemini CLI, Copilot, and 14 other agents.
 
 ## Core Workflow
 
@@ -41,6 +42,18 @@ cass search "authentication flow design" --mode semantic --json --limit 10
 cass search "retry logic for API calls" --mode hybrid --json --limit 10
 ```
 
+#### Time Filters
+
+Narrow results to a specific time window:
+
+```bash
+cass search "error" --today --json                    # today only
+cass search "migration" --week --json                 # last 7 days
+cass search "feature" --days 30 --json                # last 30 days
+cass search "refactor" --since 2025-01-01 --json      # since date
+cass search "deploy" --since 2025-03-01 --until 2025-03-15 --json  # date range
+```
+
 #### Filtering
 
 ```bash
@@ -50,8 +63,29 @@ cass search "error handling" --agent claude_code --json
 # Filter by workspace
 cass search "database migration" --workspace /path/to/project --json
 
+# Filter by source (multi-machine)
+cass search "deploy" --source work-laptop --json
+
 # Chained searches (narrow results progressively)
 cass search "auth" --robot-format sessions | cass search "JWT" --sessions-from - --json
+```
+
+#### Aggregation
+
+Get overview counts instead of full results (~99% token reduction):
+
+```bash
+# Count by agent
+cass search "error" --json --aggregate agent
+
+# Multi-field aggregation
+cass search "*" --json --aggregate agent,workspace
+
+# Time distribution
+cass search "bug" --json --aggregate date --week
+
+# Match type distribution
+cass search "config" --json --aggregate match_type
 ```
 
 #### Token-Efficient Output
@@ -65,11 +99,41 @@ cass search "<query>" --json --fields minimal
 # Summary fields
 cass search "<query>" --json --fields summary
 
+# Provenance fields (source tracking)
+cass search "<query>" --json --fields provenance
+
 # Token budget
 cass search "<query>" --json --max-tokens 2000
 
 # Truncate content
 cass search "<query>" --json --max-content-length 500
+
+# Most compact format (Token-Optimized Object Notation)
+cass search "<query>" --robot-format toon --max-tokens 2000
+```
+
+#### Query Analysis
+
+Understand how a query will be executed before running it:
+
+```bash
+# Explain query plan
+cass search "complex query" --explain --json
+
+# Dry run (no execution)
+cass search "complex query" --dry-run --json
+```
+
+#### Cursor Pagination
+
+Iterate through large result sets efficiently:
+
+```bash
+# First page
+cass search "error" --json --limit 10 --robot-meta --request-id page1
+
+# Next page (use next_cursor from _meta)
+cass search "error" --json --limit 10 --cursor <next_cursor> --request-id page2
 ```
 
 ### 2. Drill Down
@@ -108,17 +172,27 @@ JSON search results contain these key fields per hit:
 | `score` | Relevance score |
 | `content` | Matching text snippet |
 | `workspace` | Project workspace path |
+| `created_at` | Timestamp |
+| `match_type` | How the match was found |
+| `source_id` | Source identifier (local, remote hostname) |
+
+When using `--robot-meta`, the `_meta` block includes:
+- `elapsed_ms` - Query time
+- `next_cursor` - For pagination
+- `index_freshness` - Staleness info
+- `tokens_estimated` - Approximate token count
 
 ## Best Practices
 
 - Start with lexical search for specific terms; switch to hybrid for conceptual queries.
+- Use `--aggregate` for overview queries before drilling into details.
 - Use `--fields minimal` when scanning many results to save tokens.
+- Use `--robot-format toon` for maximum token efficiency.
 - Chain searches to narrow: first broad query, then pipe to a more specific query.
+- Use time filters to scope searches to relevant periods.
 - Always drill down with `cass expand` before synthesizing an answer.
 - Store valuable findings to memory immediately after discovery.
 
 ## Additional Resources
 
-### Reference Files
-
-- **`references/command-reference.md`** - Complete CASS CLI reference with all flags and options
+- **[Command Reference](../../references/command-reference.md)** - Complete CASS CLI v0.2.7 reference

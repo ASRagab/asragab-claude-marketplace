@@ -10,7 +10,7 @@
       "name": "cass",
       "source": "./plugins/cass",
       "description": "Cross-agent session search, context, analytics, and learnings powered by CASS CLI",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "name": "skill-eval",

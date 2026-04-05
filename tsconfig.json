@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["bun-types"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "paths": {
+      "@skill-eval/*": ["./plugins/skill-eval/scripts/*"]
+    }
+  },
+  "include": [
+    "tests/**/*.ts",
+    "plugins/skill-eval/scripts/**/*.ts"
+  ]
+}

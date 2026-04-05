@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "bun test tests/",
+    "test:unit": "bun test tests/skill-eval/unit/",
+    "check": "cd plugins/skill-eval/scripts && bunx tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0"
+  }
+}

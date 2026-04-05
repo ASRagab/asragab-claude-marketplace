@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0"
+  },
+  "scripts": {
+    "check": "bunx tsc --noEmit"
+  }
+}

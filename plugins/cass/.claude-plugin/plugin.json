@@ -1,6 +1,6 @@
 {
   "name": "cass",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Cross-agent session search, context loading, token analytics, session export, remote sources, and learning synthesis powered by CASS (Coding Agent Session Search)",
   "author": {
     "name": "ASRagab",

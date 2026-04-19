@@ -12,8 +12,8 @@
 
 ## 3. Ship
 
-- [ ] 3.1 Stage the hook change and the openspec artifacts; commit with a conventional message
-- [ ] 3.2 Push the branch to origin
-- [ ] 3.3 Open a PR against `main`; include the failure mode and the verification steps in the PR body
-- [ ] 3.4 Merge the PR (squash) once checks are green
-- [ ] 3.5 Pull `main` locally and confirm the fix landed; run `opsx:archive --skip-specs` if appropriate
+- [x] 3.1 Stage the hook change and the openspec artifacts; commit with a conventional message
+- [x] 3.2 Push the branch to origin
+- [x] 3.3 Open a PR against `main`; include the failure mode and the verification steps in the PR body
+- [x] 3.4 Merge the PR (squash) once checks are green
+- [x] 3.5 Pull `main` locally and confirm the fix landed; run `opsx:archive --skip-specs` if appropriate

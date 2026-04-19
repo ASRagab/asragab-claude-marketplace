@@ -80,5 +80,5 @@
 
 - [x] Bump plugin version, update plugin.json — done in Task 1.
 - [x] Branch: `feat/cass-plugin-v0.3.0` — created at start of apply.
-- [ ] Commit per phase for reviewability — **PAUSED for user approval.**
-- [ ] PR description includes: token-size before/after table, list of new commands surfaced, version-floor declaration — **PAUSED for user approval.**
+- [x] Commit per phase for reviewability — 6 commits on `feat/cass-plugin-v0.3.0`.
+- [x] PR description includes: token-size before/after table, list of new commands surfaced, version-floor declaration — PR #5: <https://github.com/ASRagab/asragab-claude-marketplace/pull/5>

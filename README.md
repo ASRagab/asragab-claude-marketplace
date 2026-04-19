@@ -6,7 +6,7 @@ A Claude Code plugin marketplace containing plugins for session search/analytics
 
 | Plugin | Version | Description |
 |--------|---------|-------------|
-| [cass](#cass) | 0.2.0 | Cross-agent session search, context, analytics, export, and learnings powered by CASS CLI |
+| [cass](#cass) | 0.3.0 | Cross-agent session search, context, analytics, export, learnings, and **session resume** powered by CASS CLI |
 | [skill-eval](#skill-eval) | 1.0.0 | Automated skill/prompt/tool evaluation and improvement via session log analysis and autoresearch optimization |
 
 ## Installation
@@ -29,13 +29,15 @@ claude plugin install skill-eval
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - [Bun runtime](https://bun.sh) (required by skill-eval scripts)
-- [CASS CLI](https://github.com/search?q=cass+coding+agent+session+search) v0.2.7+ (required by cass plugin)
+- [CASS CLI](https://github.com/Dicklesworthstone/coding_agent_session_search) v0.3.0+ (required by cass plugin)
 
 ---
 
 ## cass
 
-Cross-agent session search, context loading, token analytics, session export, and learning synthesis powered by [CASS](https://github.com/search?q=cass+coding+agent+session+search) (Coding Agent Session Search). Searches across Claude Code, Codex, Cursor, Gemini CLI, Copilot, and 14+ other agents.
+Cross-agent session search, context loading, token analytics, session export, **session resume**, and learning synthesis powered by [CASS](https://github.com/Dicklesworthstone/coding_agent_session_search) (Coding Agent Session Search). Searches across Claude Code, Codex, Cursor, Gemini CLI, Copilot, and 14+ other agents.
+
+Recipes default to token-efficient output (`--robot-format toon --fields summary --max-tokens 1600`). The plugin's SessionStart hook surfaces the CASS index health, recommended next action, and a `CASS_OUTPUT_FORMAT=toon` advisory.
 
 ### Skills
 
@@ -44,8 +46,8 @@ Cross-agent session search, context loading, token analytics, session export, an
 Search across all indexed coding agent sessions. Supports lexical (BM25), semantic (vector), and hybrid search modes.
 
 ```bash
-cass search "authentication flow" --mode hybrid --json --limit 10
-cass search "error" --days 30 --json --aggregate agent
+cass search "authentication flow" --mode hybrid --robot-format toon --fields summary --max-tokens 1600 --limit 10
+cass search "error" --days 30 --aggregate agent --limit 1 --max-content-length 100 --robot-format toon
 ```
 
 #### `/cass:session-context`
@@ -53,7 +55,7 @@ cass search "error" --days 30 --json --aggregate agent
 Load relevant past session context for the current task, file, or project.
 
 ```bash
-cass sessions --current --json
+cass sessions --current --robot-format toon
 cass timeline --since 7d --json --group-by day
 ```
 
@@ -80,8 +82,16 @@ cass export-html <session_path> --encrypt --password "secret" --filename report.
 Extract patterns, recurring issues, and actionable lessons from past sessions.
 
 ```bash
-cass search "error fix bug" --mode hybrid --json --limit 20
+cass search "error fix bug" --mode hybrid --robot-format toon --fields summary --max-tokens 1600 --limit 20
 cass analytics tools --limit 20 --json
+```
+
+#### `/cass:session-resume` ★ NEW v0.3.0
+
+Resolve a session into a ready-to-run launch command for its native harness (Claude Code, Codex, OpenCode, pi_agent, Gemini). Triggered by phrases like "resume that session", "pick up where I left off", "continue the X session".
+
+```bash
+cass resume "$(cass sessions --current --json | jq -r '.sessions[0].path')" --json
 ```
 
 #### `/cass:session-maintenance`

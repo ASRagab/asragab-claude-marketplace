@@ -159,7 +159,7 @@ else:
 
 _emit(msg)
 PY
-)
+) || output=""  # python3 missing/failed: fall through to emit_safe_default below (set -e would otherwise kill the script)
 
 if [ -z "$output" ]; then
   emit_safe_default

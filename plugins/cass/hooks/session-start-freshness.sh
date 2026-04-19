@@ -2,70 +2,119 @@
 # CASS Index Freshness + Version Floor — SessionStart hook
 #   - Reports index status with actionable guidance
 #   - Surfaces `recommended_action` from `cass status` when unhealthy
-#   - Exports CASS_OUTPUT_FORMAT=toon for downstream `cass` calls when CLI >= 0.3.0
+#   - Advises `export CASS_OUTPUT_FORMAT=toon` when CLI >= 0.3.0
 #   - Emits upgrade advisory when CLI < 0.3.0
+#
+# All systemMessage composition happens in Python via json.dumps so any
+# CLI-derived value (containing quotes, backslashes, newlines, etc.) is
+# safely escaped — no shell string interpolation into JSON anywhere.
 
 set -euo pipefail
 
-emit() {
-  # Single JSON line on stdout for SessionStart hook contract.
-  printf '%s\n' "$1"
+emit_safe_default() {
+  printf '%s\n' '{"continue":true}'
 }
 
-# --- 0. CLI detection + version floor -----------------------------------------
+# --- 0. CLI presence check ---------------------------------------------------
 if ! command -v cass >/dev/null 2>&1; then
-  emit '{"continue":true,"systemMessage":"cass CLI not found on PATH. Install: https://github.com/Dicklesworthstone/coding_agent_session_search"}'
+  printf '%s\n' '{"continue":true,"systemMessage":"cass CLI not found on PATH. Install: https://github.com/Dicklesworthstone/coding_agent_session_search"}'
   exit 0
 fi
 
-# Prefer api-version (cheapest); fall back to capabilities.
-ver_json=$(cass api-version --json 2>/dev/null || cass capabilities --json 2>/dev/null || echo '{}')
-crate_version=$(printf '%s' "$ver_json" | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    print(d.get('crate_version', 'unknown'))
-except Exception:
-    print('unknown')
-" 2>/dev/null || echo unknown)
+# --- 1. Probe CLI (best-effort; empty strings on failure) --------------------
+ver_json=$(cass api-version --json 2>/dev/null || cass capabilities --json 2>/dev/null || true)
+health_json=$(cass health --json 2>/dev/null || true)
+status_json=$(cass status --json 2>/dev/null || true)
 
-version_ok=false
-if [ "$crate_version" != "unknown" ]; then
-  major=$(printf '%s' "$crate_version" | awk -F. '{print $1+0}')
-  minor=$(printf '%s' "$crate_version" | awk -F. '{print $2+0}')
-  if [ "$major" -gt 0 ] || { [ "$major" -eq 0 ] && [ "$minor" -ge 3 ]; }; then
-    version_ok=true
-  fi
-fi
+# --- 2. Hand everything to Python; it composes the final JSON envelope -------
+output=$(
+  CASS_VER_JSON="$ver_json" \
+  CASS_HEALTH_JSON="$health_json" \
+  CASS_STATUS_JSON="$status_json" \
+  python3 - <<'PY' 2>/dev/null
+import json, os, sys
 
-# --- 1. Health probe ----------------------------------------------------------
-health_json=$(cass health --json 2>/dev/null || echo '{}')
-status_json=$(cass status --json 2>/dev/null || echo '{}')
+SKILLS = ("session-search, session-context, session-resume, "
+          "session-analytics, session-learnings, session-export, "
+          "or session-maintenance")
+MIN_MAJOR, MIN_MINOR = 0, 3
 
-parsed=$(
-  HEALTH_JSON="$health_json" STATUS_JSON="$status_json" python3 - <<'PY' 2>/dev/null
-import json, os, shlex
 
 def _load(env_var):
-    raw = os.environ.get(env_var, '') or ''
+    raw = os.environ.get(env_var) or ""
+    if not raw:
+        return {}
     try:
-        v = json.loads(raw) if raw else {}
+        v = json.loads(raw)
         return v if isinstance(v, dict) else {}
     except Exception:
         return {}
 
-h = _load('HEALTH_JSON')
-s = _load('STATUS_JSON')
-healthy = bool(h.get('healthy', False))
-status_str = str(h.get('status', 'unknown') or 'unknown')
-idx = (h.get('state') or {}).get('index') or s.get('index') or {}
-db = h.get('db') or s.get('database') or {}
-sdb = (h.get('state') or {}).get('database') or {}
-pending = (h.get('state') or {}).get('pending') or s.get('pending') or {}
-stale = bool(idx.get('stale', False))
-exists = bool(idx.get('exists', False))
-rebuilding = bool(idx.get('rebuilding', False))
-last = str(idx.get('last_indexed_at') or 'unknown')
+
+def _str(x, default=""):
+    if x is None:
+        return default
+    return str(x)
+
+
+def _int(x, default=0):
+    try:
+        return int(x)
+    except (TypeError, ValueError):
+        return default
+
+
+def _emit(msg):
+    # json.dumps escapes ALL special characters; safe for any payload.
+    sys.stdout.write(json.dumps({"continue": True, "systemMessage": msg}))
+
+
+def _emit_bare():
+    sys.stdout.write(json.dumps({"continue": True}))
+
+
+ver = _load("CASS_VER_JSON")
+crate_version = _str(ver.get("crate_version"), "unknown")
+
+version_ok = False
+if crate_version != "unknown":
+    parts = (crate_version.split(".") + ["0", "0"])[:3]
+    try:
+        major = int("".join(c for c in parts[0] if c.isdigit()) or 0)
+        minor = int("".join(c for c in parts[1] if c.isdigit()) or 0)
+        version_ok = (major, minor) >= (MIN_MAJOR, MIN_MINOR)
+    except Exception:
+        pass
+
+upgrade_advisory = ""
+if not version_ok and crate_version != "unknown":
+    upgrade_advisory = (
+        f" cass CLI v{crate_version} detected; plugin recommends >= "
+        f"{MIN_MAJOR}.{MIN_MINOR}.0 (resume command, robot-docs, TOON support). "
+        "Upgrade with `brew upgrade cass` or installer."
+    )
+
+toon_advisory = ""
+if version_ok:
+    toon_advisory = " Hook tip: export CASS_OUTPUT_FORMAT=toon for token-efficient cass output."
+
+h = _load("CASS_HEALTH_JSON")
+s = _load("CASS_STATUS_JSON")
+
+# Best-effort: gather all index/db signals from either source.
+state = h.get("state") or {}
+idx = state.get("index") or s.get("index") or {}
+db = h.get("db") or s.get("database") or state.get("database") or {}
+sdb = state.get("database") or {}
+pending = state.get("pending") or s.get("pending") or {}
+
+healthy = bool(h.get("healthy", False))
+status_str = _str(h.get("status"), "unknown")
+stale = bool(idx.get("stale", False))
+exists = bool(idx.get("exists", False))
+rebuilding = bool(idx.get("rebuilding", False))
+last_indexed = _str(idx.get("last_indexed_at"), "unknown")
+
 
 def _val(k):
     for src in (db, sdb):
@@ -74,69 +123,46 @@ def _val(k):
             return v
     return 0
 
-convos = _val('conversations') or 0
-msgs = _val('messages') or 0
-pending_sessions = pending.get('sessions') or 0
-recommended = str(s.get('recommended_action') or h.get('recommended_action') or '').strip()
 
-def _emit(name, value):
-    print(f"{name}={shlex.quote(str(value))}")
+conversations = _int(_val("conversations"))
+messages = _int(_val("messages"))
+pending_sessions = _int(pending.get("sessions"))
+recommended = _str(s.get("recommended_action") or h.get("recommended_action")).strip()
 
-_emit('healthy', 'true' if healthy else 'false')
-_emit('status', status_str)
-_emit('stale', 'true' if stale else 'false')
-_emit('exists', 'true' if exists else 'false')
-_emit('rebuilding', 'true' if rebuilding else 'false')
-_emit('last_indexed', last)
-_emit('conversations', convos)
-_emit('messages', msgs)
-_emit('pending_sessions', pending_sessions)
-_emit('recommended', recommended)
+# If we have NO probe data at all, stay silent.
+if not h and not s and not ver:
+    _emit_bare()
+    sys.exit(0)
+
+# Branch composition — pure string assembly, no shell-side escaping.
+if healthy and not stale:
+    msg = (f"CASS index healthy: {conversations} conversations, "
+           f"{messages} messages indexed (last: {last_indexed}).")
+    if pending_sessions > 0:
+        msg += f" {pending_sessions} sessions pending indexing."
+    msg += f" Use {SKILLS} skills to query agent history."
+    msg += toon_advisory + upgrade_advisory
+elif rebuilding:
+    msg = (f"CASS index is rebuilding (status: {status_str}). "
+           "Searches may return partial results. "
+           "Use session-maintenance skill if rebuild seems stuck."
+           + upgrade_advisory)
+elif healthy and stale:
+    rec = recommended or "Run `cass index` to refresh."
+    msg = f"CASS index stale (last indexed: {last_indexed}). {rec}{upgrade_advisory}"
+elif not exists:
+    rec = recommended or "Run `cass index --full` to build the index."
+    msg = f"CASS index not found. {rec}{upgrade_advisory}"
+else:
+    rec = recommended or "Run `cass doctor --fix` or use session-maintenance skill for diagnostics."
+    msg = f"CASS status: {status_str}. {rec}{upgrade_advisory}"
+
+_emit(msg)
 PY
 )
 
-if [ -z "$parsed" ]; then
-  emit '{"continue":true}'
-  exit 0
-fi
-eval "$parsed" || { emit '{"continue":true}'; exit 0; }
-
-# --- 2. Compose advisories ---------------------------------------------------
-skills_list="session-search, session-context, session-resume, session-analytics, session-learnings, session-export, or session-maintenance"
-
-# Hook contract: SessionStart hook may also expose env via hookSpecificOutput.
-# We export CASS_OUTPUT_FORMAT=toon when version supports it. If the harness
-# does not propagate exports across tool calls, recipes still pass the
-# per-call `--robot-format toon` flag — both forms are honored by cass.
-hook_env=""
-if [ "$version_ok" = "true" ]; then
-  hook_env=' Hook tip: export CASS_OUTPUT_FORMAT=toon for token-efficient cass output.'
-fi
-
-version_advisory=""
-if [ "$version_ok" != "true" ] && [ "$crate_version" != "unknown" ]; then
-  version_advisory=" cass CLI v${crate_version} detected; plugin recommends >= 0.3.0 (resume command, robot-docs, TOON support). Upgrade with `brew upgrade cass` or installer."
-fi
-
-if [ "$healthy" = "true" ] && [ "$stale" = "false" ]; then
-  msg="CASS index healthy: ${conversations} conversations, ${messages} messages indexed (last: ${last_indexed})."
-  if [ "${pending_sessions:-0}" -gt 0 ] 2>/dev/null; then
-    msg="${msg} ${pending_sessions} sessions pending indexing."
-  fi
-  msg="${msg} Use ${skills_list} skills to query agent history.${hook_env}${version_advisory}"
-  emit "{\"continue\":true,\"systemMessage\":\"${msg}\"}"
-elif [ "$rebuilding" = "true" ]; then
-  emit "{\"continue\":true,\"systemMessage\":\"CASS index is rebuilding (status: ${status}). Searches may return partial results. Use session-maintenance skill if rebuild seems stuck.${version_advisory}\"}"
-elif [ "$healthy" = "true" ] && [ "$stale" = "true" ]; then
-  rec_text="Run \`cass index\` to refresh."
-  [ -n "${recommended:-}" ] && rec_text="$recommended"
-  emit "{\"continue\":true,\"systemMessage\":\"CASS index stale (last indexed: ${last_indexed}). ${rec_text}${version_advisory}\"}"
-elif [ "$exists" = "false" ]; then
-  rec_text="Run \`cass index --full\` to build the index."
-  [ -n "${recommended:-}" ] && rec_text="$recommended"
-  emit "{\"continue\":true,\"systemMessage\":\"CASS index not found. ${rec_text}${version_advisory}\"}"
+if [ -z "$output" ]; then
+  emit_safe_default
 else
-  rec_text="Run \`cass doctor --fix\` or use session-maintenance skill for diagnostics."
-  [ -n "${recommended:-}" ] && rec_text="$recommended"
-  emit "{\"continue\":true,\"systemMessage\":\"CASS status: ${status}. ${rec_text}${version_advisory}\"}"
+  printf '%s\n' "$output"
 fi

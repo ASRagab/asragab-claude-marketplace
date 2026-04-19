@@ -8,7 +8,7 @@ description: >-
   "tool usage patterns", "which agent is best for",
   or wants to extract patterns, recurring issues, and actionable lessons
   from past coding agent sessions for self-improvement.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # Session Learnings
@@ -17,21 +17,23 @@ Extract patterns, recurring issues, and actionable lessons from past coding
 agent sessions. Synthesize knowledge from history across all agents to drive
 self-improvement and avoid repeating mistakes.
 
+## Token-efficient defaults
+
+Recipes default to `--robot-format toon --fields summary --max-tokens 1600`.
+
 ## Core Workflow
 
 ### 1. Identify a Topic
 
-Start with a specific area to analyze:
-
 ```bash
-# Search for errors and failures
-cass search "error fix bug" --mode hybrid --json --limit 20 --fields summary
+# Errors and failures
+cass search "error fix bug" --mode hybrid --robot-format toon --fields summary --max-tokens 1600 --limit 20
 
-# Search for specific problem domains
-cass search "<topic> problem issue" --mode hybrid --json --limit 15
+# Specific problem domain
+cass search "<topic> problem issue" --mode hybrid --robot-format toon --fields summary --max-tokens 1600 --limit 15
 
-# Time-scoped search
-cass search "error" --days 30 --json --fields summary --limit 20
+# Time-scoped
+cass search "error" --days 30 --robot-format toon --fields summary --max-tokens 1600 --limit 20
 ```
 
 ### 2. Quick Pattern Scan via Aggregation
@@ -39,14 +41,15 @@ cass search "error" --days 30 --json --fields summary --limit 20
 Before diving into individual sessions, get an overview:
 
 ```bash
-# Error distribution by agent
-cass search "error fix bug" --json --aggregate agent --days 30
+# Error distribution by agent (overview only — --limit 1 + --max-content-length
+# suppress the hit-list dump --aggregate emits by default)
+cass search "error fix bug" --aggregate agent --days 30 --limit 1 --max-content-length 100 --robot-format toon
 
 # Error distribution over time
-cass search "error" --json --aggregate date --days 30
+cass search "error" --aggregate date --days 30 --limit 1 --max-content-length 100 --robot-format toon
 
 # Topic frequency by workspace
-cass search "<topic>" --json --aggregate workspace
+cass search "<topic>" --aggregate workspace --limit 1 --max-content-length 100 --robot-format toon
 ```
 
 ### 3. Tool Usage Analysis
@@ -105,15 +108,17 @@ Before storing, recall existing memories on the topic to avoid duplicates.
 Find recurring errors and their resolutions:
 
 ```bash
-# Aggregate errors by agent to find where problems concentrate
-cass search "error failed exception crash" --json --aggregate agent --days 30
+# Aggregate errors by agent — find where problems concentrate.
+# --limit 1 + --max-content-length 100 keeps overview compact.
+# (--fields cannot be combined with --aggregate.)
+cass search "error failed exception crash" --aggregate agent --days 30 --limit 1 --max-content-length 100 --robot-format toon
 
-# Then drill into specific agents
-cass search "error failed" --agent claude_code --mode hybrid --json --limit 20
+# Drill into specific agents
+cass search "error failed" --agent claude_code --mode hybrid --robot-format toon --fields summary --max-tokens 1600 --limit 20
 
-# Search for specific error types
-cass search "TypeError undefined null" --json --limit 10
-cass search "authentication expired token" --json --limit 10
+# Specific error types
+cass search "TypeError undefined null" --robot-format toon --fields summary --max-tokens 1600 --limit 10
+cass search "authentication expired token" --robot-format toon --fields summary --max-tokens 1600 --limit 10
 ```
 
 For each cluster of similar errors, extract:
@@ -155,7 +160,7 @@ Compare how different agents handled similar problems:
 
 ```bash
 # Aggregate by agent for a topic
-cass search "<topic>" --json --aggregate agent
+cass search "<topic>" --aggregate agent --limit 1 --max-content-length 100 --robot-format toon
 
 # Then drill into specific agents
 cass search "<topic>" --agent claude_code --json --limit 5
@@ -209,4 +214,4 @@ When presenting learnings, structure as:
 
 ## Additional Resources
 
-- **[Command Reference](../../references/command-reference.md)** - Complete CASS CLI v0.2.7 reference
+- **[Command Reference](../../references/command-reference.md)** - CASS CLI v0.3.x reference (hot-path commands inline; long-tail topics via `cass robot-docs <topic>`)

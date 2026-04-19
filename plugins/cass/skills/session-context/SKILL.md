@@ -8,7 +8,7 @@ description: >-
   "bring me up to speed", "current session info", "list recent sessions",
   or needs to pull relevant past session context for the current task,
   file, or project to inform decisions.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # Session Context
@@ -17,26 +17,26 @@ Load relevant past session context for the current task, file, or project.
 Uses CASS to find sessions related to what is being worked on right now,
 providing historical awareness across all coding agents.
 
+## Token-efficient defaults
+
+Recipes default to `--robot-format toon` and `--fields summary --max-tokens 1600` for any search. The SessionStart hook also exports `CASS_OUTPUT_FORMAT=toon` so the encoding flag is inherited; per-call flags are kept for portability.
+
 ## Core Workflow
 
 ### 1. Find the Current Session
 
-Identify the active session for this workspace:
-
 ```bash
-cass sessions --current --json
+cass sessions --current --robot-format toon
 ```
 
 ### 2. List Recent Sessions
 
-Browse recent sessions for a project:
-
 ```bash
 # Sessions for current workspace
-cass sessions --workspace "$(pwd)" --json --limit 10
+cass sessions --workspace "$(pwd)" --robot-format toon --limit 10
 
 # All recent sessions
-cass sessions --json --limit 15
+cass sessions --robot-format toon --limit 15
 ```
 
 ### 3. Find Related Sessions by File
@@ -52,17 +52,19 @@ discussions, and debugging sessions.
 
 ### 4. Find Related Sessions by Topic
 
-Combine workspace filtering with topical search:
-
 ```bash
 # Hybrid search within current project
-cass search "<current task description>" --workspace "$(pwd)" --mode hybrid --json --limit 10
+cass search "<current task description>" --workspace "$(pwd)" --mode hybrid --robot-format toon --fields summary --max-tokens 1600 --limit 10
 
-# Search with time scope
-cass search "<topic>" --workspace "$(pwd)" --days 30 --json --limit 10
+# With time scope
+cass search "<topic>" --workspace "$(pwd)" --days 30 --robot-format toon --fields summary --max-tokens 1600 --limit 10
 
-# Search across all sources (multi-machine)
-cass search "<topic>" --source all --json --limit 10
+# Across all sources (multi-machine) — omit --source to scan local + every configured remote
+cass search "<topic>" --robot-format toon --fields summary --max-tokens 1600 --limit 10
+
+# Scope to remotes only (use the literal "remote" keyword) or to a specific hostname
+cass search "<topic>" --source remote --robot-format toon --fields summary --max-tokens 1600 --limit 10
+cass search "<topic>" --source <hostname> --robot-format toon --fields summary --max-tokens 1600 --limit 10
 ```
 
 ### 5. Timeline View
@@ -88,11 +90,13 @@ cass timeline --since 7d --agent claude_code --json
 Get a fast summary without loading full results:
 
 ```bash
-# Activity by agent in last 7 days
-cass search "*" --json --aggregate agent --week
+# Activity by agent (last 7 days). --limit 1 + --max-content-length suppress
+# the hit-list dump that --aggregate emits by default. --fields cannot combine
+# with --aggregate.
+cass search "*" --aggregate agent --week --limit 1 --max-content-length 100 --robot-format toon
 
 # Activity by workspace
-cass search "*" --json --aggregate workspace --days 30
+cass search "*" --aggregate workspace --days 30 --limit 1 --max-content-length 100 --robot-format toon
 ```
 
 ### 7. Expand Key Sessions
@@ -137,7 +141,7 @@ Catch up on recent activity in the project:
 cass timeline --since 3d --json --group-by day
 
 # Quick agent breakdown
-cass search "*" --json --aggregate agent --days 3
+cass search "*" --aggregate agent --days 3 --limit 1 --max-content-length 100 --robot-format toon
 
 # Drill into specific sessions
 cass expand <path> --line <line> -C 10 --json
@@ -156,8 +160,11 @@ cass search "decided to use <technology>" --workspace "$(pwd)" --mode hybrid --j
 Pull context from remote sources:
 
 ```bash
-# Search across all machines
-cass search "deployment script" --source all --json
+# Search across all machines (omit --source for full union of local + remotes)
+cass search "deployment script" --robot-format toon --fields summary --max-tokens 1600
+
+# Or scope to remotes only
+cass search "deployment script" --source remote --robot-format toon --fields summary --max-tokens 1600
 
 # Search specific remote
 cass search "config" --source work-laptop --json
@@ -168,10 +175,15 @@ cass search "config" --source work-laptop --json
 - Use `cass sessions --current` as a starting point for current workspace context.
 - Combine timeline views with targeted searches for comprehensive context.
 - Use `--aggregate` for quick overviews before drilling into specifics.
+- Default flags: `--robot-format toon --fields summary --max-tokens 1600`.
 - Use time filters (`--days`, `--since`) to scope context to relevant periods.
 - Store discovered context to memory to avoid re-searching in future sessions.
 - When context spans multiple sessions, synthesize findings before presenting.
 
+## Related Skills
+
+- **`session-resume`** — when the goal is "pick up where I left off" (returns a runnable command rather than a synthesis). Hand off here once the right session is identified.
+
 ## Additional Resources
 
-- **[Command Reference](../../references/command-reference.md)** - Complete CASS CLI v0.2.7 reference
+- **[Command Reference](../../references/command-reference.md)** - CASS CLI v0.3.x reference (hot-path commands inline; long-tail topics via `cass robot-docs <topic>`)

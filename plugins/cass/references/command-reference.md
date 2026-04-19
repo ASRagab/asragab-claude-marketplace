@@ -1,8 +1,73 @@
-# CASS CLI Command Reference — v0.2.7
+# CASS CLI Command Reference — v0.3.x
+
+This reference inlines the **stable hot-path commands** used by every skill. For long-tail topics (analytics schemas, sources internals, contracts, exit codes, env vars, paths), call the live machine docs:
+
+```bash
+cass robot-docs <topic>     # topics: commands, env, paths, schemas, guide,
+                            #         exit-codes, examples, contracts, wrap,
+                            #         sources, analytics
+cass --robot-help           # deterministic wide-format help
+cass introspect --json      # full API schema dump
+cass api-version --json     # crate / api / contract version triple
+cass capabilities --json    # features, connectors, limits
+```
+
+---
+
+## New in v0.3.x (vs v0.2.x)
+
+| Command / Flag | Purpose | Skill exposing it |
+|----------------|---------|-------------------|
+| `cass resume <path>` | Resolve session path → ready-to-run launch command for native harness (Claude Code, Codex, OpenCode, pi_agent, Gemini) | **session-resume** (new) |
+| `cass robot-docs <topic>` | Live machine-readable docs (replaces static long-tail content) | (used across skills) |
+| `cass api-version` | Crate/API/contract version triple | hooks (version floor) |
+| `cass introspect --json` | Full schema dump (commands, args, response shapes) | future skills (deferred) |
+| `cass --robot-help` | Deterministic wide-format help fallback | (debug) |
+| `cass pages` | Encrypted searchable static archive (P4.x) | future skill (deferred) |
+| `cass sources mappings` | Remote source path-mapping management | session-maintenance |
+| `cass sources doctor` | SSH/connectivity diagnostics for remote sources | session-maintenance |
+| `cass state` | Alias of `cass status` | (compat) |
+| `--robot-format toon` | Token-Optimized Object Notation encoding | all skills (default) |
+| `--two-tier`, `--fast-only`, `--quality-only`, `--reranker` | Search retrieval tuning | session-search |
+| `--approximate` | HNSW ANN semantic search (after `--build-hnsw` indexing) | session-search |
+| `--daemon` / `--no-daemon` | Per-call control of semantic model daemon | session-search |
+| `--trace-file <PATH>` | JSONL spans for debugging | (debug) |
+| NDJSON event stream on `cass index --json` stderr | `started\|phase\|progress\|completed\|error` events | session-maintenance |
+| `--progress-interval-ms N` | Tune index event frequency | session-maintenance |
+
+Live release notes: <https://github.com/Dicklesworthstone/coding_agent_session_search/releases>
+
+---
+
+## Token-efficient defaults
+
+Every skill recipe should default to:
+
+```
+--robot-format toon --fields summary --max-tokens 1600
+```
+
+Or set the encoding once via env:
+
+```bash
+export CASS_OUTPUT_FORMAT=toon
+```
+
+Hook `session-start-freshness.sh` exports this when CLI ≥ 0.3.0.
+
+Token-size measurement (search "test" --limit 2):
+
+| Recipe | Bytes | Reduction |
+|--------|-------|-----------|
+| `--json` (default) | 85,445 | baseline |
+| `--robot-format toon` (no field cap) | 84,848 | ~1% |
+| `--robot-format toon --fields summary --max-tokens 1600` | 756 | ~99% |
+
+Field/budget caps drive the win; TOON encoding adds 1-2% on top.
+
+---
 
 ## Global Options
-
-These flags apply to all commands.
 
 | Flag | Description |
 |------|-------------|
@@ -13,7 +78,9 @@ These flags apply to all commands.
 | `--progress <auto\|bars\|plain\|none>` | Progress display style |
 | `--wrap <N>` | Wrap output to N columns |
 | `--nowrap` | Disable wrapping |
-| `--robot-format <FMT>` | Global output format: `json`, `jsonl`, `compact`, `sessions`, `toon` |
+| `--robot-format <FMT>` | Output format: `json`, `jsonl`, `compact`, `sessions`, `toon` |
+| `--trace-file <PATH>` | Write JSONL trace spans to PATH (debug) |
+| `--robot-help` | Deterministic machine-first help (wide, no TUI) |
 
 ---
 
@@ -25,11 +92,11 @@ These flags apply to all commands.
 | `jsonl` | Newline-delimited JSON |
 | `compact` | Single-line JSON |
 | `sessions` | One `source_path` per line |
-| `toon` | Token-Optimized Object Notation — most compact |
+| `toon` | Token-Optimized Object Notation — encoding-efficient (default for plugin) |
 
 ---
 
-## Commands
+## Hot-path Commands
 
 ### `cass search <QUERY>`
 
@@ -40,13 +107,13 @@ Full-text, semantic, and hybrid search across indexed conversations.
 | Flag | Description |
 |------|-------------|
 | `--mode <MODE>` | `lexical` (default), `semantic`, `hybrid` |
-| `--approximate` | Use approximate nearest-neighbor (semantic) |
+| `--approximate` | Use HNSW approximate nearest-neighbor (semantic) |
 | `--rerank` | Enable reranking |
-| `--reranker <MODEL>` | Reranker model to use |
+| `--reranker <MODEL>` | Reranker model |
 | `--model <MODEL>` | Embedding model for semantic search |
 | `--daemon` / `--no-daemon` | Control semantic model daemon |
-| `--two-tier` | Two-tier retrieval strategy |
-| `--fast-only` / `--quality-only` | Speed vs. quality tradeoff |
+| `--two-tier` | Two-tier retrieval (cheap shortlist + reranked top-K) |
+| `--fast-only` / `--quality-only` | Speed vs quality tradeoff |
 
 #### Filtering
 
@@ -54,71 +121,70 @@ Full-text, semantic, and hybrid search across indexed conversations.
 |------|-------------|
 | `--agent <AGENT>` | Filter by agent (repeatable) |
 | `--workspace <PATH>` | Filter by workspace (repeatable) |
-| `--source <SRC>` | Filter: `local`, `remote`, `all`, or hostname |
-| `--sessions-from <FILE>` | Filter to sessions from file; use `-` for stdin |
-| `--today` | Limit to today |
-| `--yesterday` | Limit to yesterday |
-| `--week` | Limit to this week |
-| `--days <N>` | Limit to last N days |
-| `--since <DATE>` | Results after date |
-| `--until <DATE>` | Results before date |
+| `--source <SRC>` | Filter: `local`, `remote`, or hostname. **Omit the flag entirely to search local + all remotes (no `all` keyword exists).** |
+| `--sessions-from <FILE>` | Filter to sessions from file; `-` for stdin |
+| `--today` / `--yesterday` / `--week` / `--days <N>` | Time scopes |
+| `--since <DATE>` / `--until <DATE>` | Date range |
 
 #### Pagination
 
 | Flag | Description |
 |------|-------------|
 | `--limit <N>` | Max results (default: `0` = no limit) |
-| `--offset <N>` | Pagination offset (default: `0`) |
-| `--cursor <CURSOR>` | Cursor-based pagination |
+| `--offset <N>` | Pagination offset |
+| `--cursor <CURSOR>` | Cursor-based pagination (preferred for large pages) |
 
-#### Output
+#### Output (token control)
 
 | Flag | Description |
 |------|-------------|
-| `--json` / `--robot` | JSON output |
-| `--robot-format <FMT>` | `json`, `jsonl`, `compact`, `sessions`, `toon` |
-| `--robot-meta` | Include extended metadata |
-| `--fields <FIELDS>` | Field selection (see below) |
-| `--max-content-length <N>` | Truncate content to N characters |
-| `--max-tokens <N>` | Soft token budget |
-| `--display <FMT>` | Human-readable: `table`, `lines`, `markdown` |
+| `--robot-format <FMT>` | Encoding (`toon` recommended) |
+| `--robot` / `--json` | Force structured output |
+| `--robot-meta` | Include `_meta` (cursor, freshness, timing) |
+| `--fields <FIELDS>` | Field selection (presets: `minimal`, `summary`, `provenance`) |
+| `--max-content-length <N>` | Truncate snippet/title/content to N chars |
+| `--max-tokens <N>` | Soft token budget (default for plugin: `1600`) |
+| `--display <FMT>` | Human format: `table`, `lines`, `markdown` |
 | `--highlight` | Highlight matching terms |
 
-#### Field Selection (`--fields`)
+#### Field presets
 
-Presets:
-
-| Preset | Fields included |
-|--------|----------------|
+| Preset | Fields |
+|--------|--------|
 | `minimal` | `path`, `line`, `agent` |
 | `summary` | `minimal` + `title`, `score` |
 | `provenance` | `source_id`, `origin_kind`, `origin_host` |
 
-Individual fields: `score`, `agent`, `workspace`, `workspace_original`, `source_path`, `snippet`, `content`, `title`, `created_at`, `line_number`, `match_type`, `source_id`, `origin_kind`, `origin_host`
+Individual: `score`, `agent`, `workspace`, `workspace_original`, `source_path`, `snippet`, `content`, `title`, `created_at`, `line_number`, `match_type`, `source_id`, `origin_kind`, `origin_host`
 
-#### Analysis
+#### Aggregation (overview, ~99% token reduction)
 
 | Flag | Description |
 |------|-------------|
-| `--aggregate <FIELDS>` | Server-side aggregation by `agent`, `workspace`, `date`, `match_type`; returns buckets with counts (~99% token reduction) |
+| `--aggregate <FIELDS>` | Server-side counts by `agent`, `workspace`, `date`, `match_type` |
 | `--explain` | Include query explanation |
 | `--dry-run` | Validate query without executing |
 | `--timeout <MS>` | Timeout in milliseconds |
 | `--request-id <ID>` | Correlation ID |
 
-#### JSON Output Fields (per hit)
+---
 
-`source_path`, `line_number`, `agent`, `title`, `score`, `content`, `workspace`, `created_at`, `match_type`, `source_id`, `origin_kind`, `origin_host`
+### `cass sessions`
+
+| Flag | Description |
+|------|-------------|
+| `--workspace <PATH>` | Filter by workspace |
+| `--current` | Resolve current workspace and return best match |
+| `--limit <N>` | Max results (default: `10`; `1` when `--current`) |
+| `--json` / `--robot-format <FMT>` | Structured output |
 
 ---
 
 ### `cass view <PATH>`
 
-View a source file at a specific line with surrounding context.
-
 | Flag | Description |
 |------|-------------|
-| `-n, --line <LINE>` | Target line number |
+| `-n, --line <LINE>` | Target line |
 | `-C, --context <N>` | Lines of context (default: `5`) |
 | `--source <SOURCE>` | Source filter |
 | `--json` | JSON output |
@@ -127,11 +193,9 @@ View a source file at a specific line with surrounding context.
 
 ### `cass expand <PATH>`
 
-Show messages surrounding a specific line.
-
 | Flag | Description |
 |------|-------------|
-| `-n, --line <LINE>` | Target line number (required) |
+| `-n, --line <LINE>` | Target line (required) |
 | `-C, --context <N>` | Messages of context (default: `3`) |
 | `--source <SOURCE>` | Source filter |
 | `--json` | JSON output |
@@ -150,30 +214,14 @@ Find related sessions for a given source path.
 
 ---
 
-### `cass sessions`
-
-List recent sessions.
-
-| Flag | Description |
-|------|-------------|
-| `--workspace <PATH>` | Filter by workspace |
-| `--current` | Resolve current workspace and return best match |
-| `--limit <N>` | Max results (default: `10`; `1` when `--current` is set) |
-| `--json` | JSON output |
-
----
-
 ### `cass timeline`
 
-Show activity timeline grouped by time bucket.
-
 | Flag | Description |
 |------|-------------|
-| `--since <TIME>` | Start time |
-| `--until <TIME>` | End time |
+| `--since <TIME>` / `--until <TIME>` | Range |
 | `--today` | Limit to today |
 | `--agent <AGENT>` | Filter by agent (repeatable) |
-| `--group-by <hour\|day\|none>` | Grouping granularity (default: `hour`) |
+| `--group-by <hour\|day\|none>` | Granularity (default: `hour`) |
 | `--source <SRC>` | Source filter |
 | `--json` | JSON output |
 
@@ -181,117 +229,39 @@ Show activity timeline grouped by time bucket.
 
 ### `cass stats`
 
-Show index statistics.
-
-| Flag | Description |
-|------|-------------|
-| `--json` | JSON output |
-
-Returns: total conversations, messages, per-agent counts, workspace stats, date range.
+Returns: total conversations, messages, per-agent counts, top workspaces, date range. Single `--json` flag.
 
 ---
 
 ### `cass health`
 
-Minimal health check. Completes in under 50ms.
-
-| Flag | Description |
-|------|-------------|
-| `--json` | JSON output |
-
-Exit codes: `0` = healthy, `1` = unhealthy.
+Pre-flight check (<50ms). Exit `0` healthy, `1` unhealthy. Single `--json` flag.
 
 ---
 
-### `cass status`
-
-Quick health check with recommendations.
+### `cass status` (alias `cass state`)
 
 | Flag | Description |
 |------|-------------|
 | `--json` | JSON output |
 | `--stale-threshold <N>` | Staleness threshold in seconds (default: `1800`) |
-| `--robot-meta` | Include extended metadata |
+| `--robot-meta` | Extended metadata |
 
----
-
-### `cass analytics <SUBCOMMAND>`
-
-Token, tool, and model analytics.
-
-#### Subcommands
-
-| Subcommand | Description |
-|------------|-------------|
-| `status` | Row counts, freshness, coverage, drift warnings |
-| `tokens` | Token usage over time |
-| `tools` | Per-tool invocation counts |
-| `models` | Top models by usage |
-| `rebuild` | Rebuild rollup tables |
-| `validate` | Check invariants, detect drift |
-
-#### Subcommand Options
-
-| Flag | Applies to | Description |
-|------|-----------|-------------|
-| `--group-by <hour\|day\|week\|month>` | `tokens` | Time grouping |
-| `--limit <N>` | `tools` | Max results (default: `20`) |
-| `--force` | `rebuild` | Force full rebuild |
-| `--fix` | `validate` | Apply safe repairs |
-
-#### Shared Flags
-
-`--since`, `--until`, `--days`, `--agent`, `--workspace`, `--source`, `--json`
-
----
-
-### `cass export <PATH>`
-
-Export a conversation to a readable format.
-
-| Flag | Description |
-|------|-------------|
-| `--format <markdown\|text\|json\|html>` | Export format (default: `markdown`) |
-| `-o, --output <FILE>` | Output file path |
-| `--include-tools` | Include tool calls |
-| `--include-skills` | Include skill invocations |
-| `--source` | Source filter |
-
----
-
-### `cass export-html <PATH>`
-
-Export a self-contained HTML file with optional AES-256-GCM encryption.
-
-| Flag | Description |
-|------|-------------|
-| `--output-dir <DIR>` | Output directory (default: current) |
-| `--filename <NAME>` | Custom filename (default: auto-generated) |
-| `--encrypt` | Enable password encryption (Web Crypto) |
-| `--password <PASS>` | Password for encryption (requires `--encrypt`) |
-| `--password-stdin` | Read password from stdin |
-| `--include-tools` | Include tool calls (default: true) |
-| `--include-skills` | Include skill content (stripped by default) |
-| `--show-timestamps` | Show message timestamps |
-| `--theme <dark\|light>` | Default theme (default: `dark`) |
-| `--no-cdns` | Fully offline (larger file) |
-| `--open` | Open in browser after export |
-| `--dry-run` | Validate without writing |
-| `--json` | JSON output |
+Returns `recommended_action` when unhealthy. Skills should surface this verbatim.
 
 ---
 
 ### `cass index`
 
-Build or update the search index.
-
 | Flag | Description |
 |------|-------------|
 | `--full` | Full reindex |
 | `--semantic` | Build semantic index |
-| `--build-hnsw` | Build HNSW index for approximate nearest-neighbor search (requires `--semantic`) |
+| `--build-hnsw` | Build HNSW for ANN (requires `--semantic`; recommended when conversations > ~10k) |
 | `--watch` | Watch for changes and reindex continuously |
-| `--json` | JSON output |
+| `--json` | NDJSON event stream on stderr (`started\|phase\|progress\|completed\|error`) |
+| `--progress-interval-ms <N>` | Event interval (250-60000, default 2000) |
+| `--no-progress-events` | Suppress NDJSON events |
 
 ---
 
@@ -301,138 +271,108 @@ Diagnose and repair index issues. Safe by default — never deletes user data.
 
 | Flag | Description |
 |------|-------------|
-| `--fix` | Apply repairs |
+| `--fix` | Apply repairs (rebuilds derived data only) |
 
 ---
 
-### `cass import`
+### `cass resume <PATH>` ★ NEW v0.3.0
 
-Import conversations from external sources.
+Resolve a session file path into a ready-to-run resume command for the session's native harness.
+
+| Flag | Description |
+|------|-------------|
+| `--agent <AGENT>` | Override detected harness: `claude` / `claude-code` / `claude_code`, `codex`, `opencode`, `pi_agent` / `pi` / `omp` / `oh-my-pi` / `ohmypi`, `gemini` |
+| `--exec` | Replace current process with resume command (mutually exclusive with `--shell` / `--json`) |
+| `--shell` | Emit single shell-escaped command line (suitable for `eval "$(cass resume ...)"`) |
+| `--json` / `--robot` | Structured output: `{ agent, session_id, command[], shell_command, detection, path }` |
 
 ---
 
-### `cass models <SUBCOMMAND>`
+### `cass export <PATH>`
 
-Manage semantic search models.
+| Flag | Description |
+|------|-------------|
+| `--format <markdown\|text\|json\|html>` | Export format (default: `markdown`) |
+| `-o, --output <FILE>` | Output file |
+| `--include-tools` | Include tool calls |
+| `--include-skills` | Include skill invocations |
+| `--source` | Source filter |
 
-| Subcommand | Description |
-|------------|-------------|
-| `status` | Show model installation status |
-| `install` | Download and install the semantic search model |
-| `verify` | Verify model integrity (SHA256 checksums) |
-| `remove` | Remove model files to free disk space |
-| `check-update` | Check for model updates |
+### `cass export-html <PATH>`
+
+Self-contained HTML with optional AES-256-GCM encryption. See `cass export-html --help` for full flag list.
+
+---
+
+## Long-tail topics (live docs)
 
 ```bash
-cass models status --json   # Show installed models and status
+cass robot-docs analytics    # cass analytics * subcommands, schemas, exit codes
+cass robot-docs sources      # cass sources setup wizard + flags
+cass robot-docs schemas      # full response schema reference
+cass robot-docs contracts    # stdout/stderr contract, color, JSON-error policy
+cass robot-docs exit-codes   # all exit codes with meanings
+cass robot-docs env          # environment variables (CASS_*, TOON_*)
+cass robot-docs paths        # default data dir / db path / log path
+cass robot-docs guide        # robot-mode handbook
+cass robot-docs examples     # canonical command examples
+cass robot-docs commands     # full command catalog
 ```
 
 ---
 
-### `cass sources <SUBCOMMAND>`
-
-Manage remote sources.
-
-| Subcommand | Description |
-|------------|-------------|
-| `setup` | Interactive wizard to discover and configure remote sources |
-| `list` | List configured sources |
-| `sync` | Sync sessions from remote sources |
-| `discover` | Auto-discover SSH hosts from ~/.ssh/config |
-| `add <URL>` | Add a new remote source (e.g. `user@hostname`) |
-| `remove` | Remove a configured source |
-| `doctor` | Diagnose source connectivity issues |
-| `mappings` | Manage path mappings for a source |
-
----
-
-### `cass introspect`
-
-Full API schema introspection.
-
-| Flag | Description |
-|------|-------------|
-| `--json` | JSON output |
-
----
-
-### `cass daemon`
-
-Run the semantic model daemon (Unix only).
-
----
-
-### `cass capabilities`
-
-Discover supported features, versions, and limits.
-
-| Flag | Description |
-|------|-------------|
-| `--json` | JSON output |
-
----
-
-### `cass diag`
-
-Show diagnostic information.
-
-| Flag | Description |
-|------|-------------|
-| `--json` | JSON output |
-| `--verbose` | Verbose diagnostic output |
-
----
-
-## Supported Connectors
-
-CASS supports 19 connectors:
+## Supported connectors (19)
 
 `claude_code`, `codex`, `gemini`, `cursor`, `opencode`, `cline`, `aider`, `amp`, `chatgpt`, `pi_agent`, `factory`, `vibe`, `clawdbot`, `copilot`, `copilot_cli`, `qwen`, `kimi`, `crush`, `openclaw`
 
+(Verify current set with `cass capabilities --json | jq .connectors`)
+
 ---
 
-## Patterns and Recipes
+## Recipe quickref
 
-### Chained Search
-
-Pipe session results from one search into a second search to narrow by session scope:
+### Token-budget search (default)
 
 ```bash
-cass search "auth" --robot-format sessions | cass search "JWT" --sessions-from - --json
+cass search "<query>" --robot-format toon --fields summary --max-tokens 1600 --limit 10
 ```
 
-### Token Optimization
-
-Minimize output token cost for agent pipelines:
+### Aggregate-first overview (~99% token reduction)
 
 ```bash
-# Minimal fields + token budget
-cass search "query" --fields minimal --max-tokens 500
-
-# Most compact format
-cass search "query" --robot-format toon
-
-# Aggregate overview (99% token reduction)
-cass search "query" --aggregate agent,date
+# --limit 1 + --max-content-length suppress the hit-list dump --aggregate
+# emits by default. --fields cannot combine with --aggregate.
+cass search "<query>" --aggregate agent,date --limit 1 --max-content-length 100 --robot-format toon
 ```
 
-### Time-Bounded Search
+### Chained search (narrow scope)
 
 ```bash
-cass search "deploy" --today
-cass search "error" --days 7
-cass search "migration" --since 2025-01-01 --until 2025-03-31
+cass search "auth" --robot-format sessions | cass search "JWT" --sessions-from - --robot-format toon --fields summary --max-tokens 1600
 ```
 
-### Semantic Search
+### Time-bounded
 
 ```bash
-cass search "authentication flow" --mode semantic
-cass search "authentication flow" --mode hybrid --rerank
+cass search "deploy" --today --robot-format toon --fields summary --max-tokens 1600
+cass search "error" --days 7 --robot-format toon --fields summary --max-tokens 1600
 ```
 
-### Current Workspace Session
+### Semantic / hybrid
 
 ```bash
-cass sessions --current   # Returns best matching session for cwd
+cass search "authentication flow" --mode semantic --approximate --daemon --robot-format toon --fields summary
+cass search "authentication flow" --mode hybrid --rerank --quality-only --robot-format toon --fields summary --max-tokens 1600
+```
+
+### Current-workspace session
+
+```bash
+cass sessions --current --robot-format toon
+```
+
+### Resume current-workspace session
+
+```bash
+cass resume "$(cass sessions --current --json | jq -r '.sessions[0].path')" --json
 ```

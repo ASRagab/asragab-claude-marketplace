@@ -7,7 +7,7 @@ description: >-
   "export chat history", "create session report",
   or needs to export a coding agent session to markdown, text, JSON, HTML,
   or encrypted HTML format for sharing, archiving, or review.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # Session Export
@@ -19,17 +19,17 @@ Supports markdown, plain text, JSON, HTML, and self-contained encrypted HTML.
 
 ### 1. Find the Session to Export
 
-First, locate the session you want to export:
+Discovery uses token-efficient output (`--robot-format toon --fields summary --max-tokens 1600`); only the actual export step produces verbose content.
 
 ```bash
 # Current session
-cass sessions --current --json
+cass sessions --current --robot-format toon
 
 # Recent sessions for this project
-cass sessions --workspace "$(pwd)" --json --limit 10
+cass sessions --workspace "$(pwd)" --robot-format toon --limit 10
 
 # Search for a specific session
-cass search "<topic>" --json --fields summary --limit 10
+cass search "<topic>" --robot-format toon --fields summary --max-tokens 1600 --limit 10
 ```
 
 ### 2. Export to Markdown (Default)
@@ -82,7 +82,7 @@ in a single file that can be opened in any browser.
 
 ```bash
 # Find the session
-cass search "the fix for auth bug" --json --fields summary --limit 5
+cass search "the fix for auth bug" --robot-format toon --fields summary --max-tokens 1600 --limit 5
 
 # Export with full tool details
 cass export <session_path> --include-tools --format html -o auth-fix-session.html
@@ -92,7 +92,7 @@ cass export <session_path> --include-tools --format html -o auth-fix-session.htm
 
 ```bash
 # List all sessions for a project
-cass sessions --workspace /path/to/project --json --limit 50
+cass sessions --workspace /path/to/project --robot-format toon --limit 50
 
 # Export each (in a script or one at a time)
 cass export <session_path> -o archive/session-001.md
@@ -143,4 +143,4 @@ cass export <session_path> --include-tools --format markdown -o review.md
 
 ## Additional Resources
 
-- **[Command Reference](../../references/command-reference.md)** - Complete CASS CLI v0.2.7 reference
+- **[Command Reference](../../references/command-reference.md)** - CASS CLI v0.3.x reference (hot-path commands inline; long-tail topics via `cass robot-docs <topic>`)

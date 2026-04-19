@@ -9,7 +9,7 @@ description: >-
   "cost analysis", "analytics health",
   or wants to understand their coding agent usage patterns,
   activity trends, token consumption, and session statistics.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # Session Analytics
@@ -20,10 +20,16 @@ for deep analysis across all indexed coding agents.
 
 ## Analytics Engine
 
-CASS v0.2.7 includes a dedicated analytics subsystem with six subcommands.
+CASS v0.3.x includes a dedicated analytics subsystem with six subcommands.
 All share common flags: `--since`, `--until`, `--days`, `--agent`, `--workspace`, `--source`, `--json`.
 
-All JSON responses use an envelope: `{ "command": "analytics/<sub>", "data": {...}, "_meta": {...} }`
+The `--source` filter accepts `local`, `remote`, or a hostname (use `cass sources list` to see configured names).
+
+All JSON responses use an envelope: `{ "command": "analytics/<sub>", "data": {...}, "_meta": {...} }`. Response schemas are documented under `cass robot-docs analytics`.
+
+### Retry guidance
+
+Analytics commands may return exit code `9` with `retryable=true` for transient SQLite lock contention. Wait 1 second and retry. Persistent exit `9` means a real database issue — run `cass doctor --fix`.
 
 ### Analytics Health
 
@@ -140,15 +146,17 @@ cass timeline --since 30d --json --group-by day
 Fast counts via search aggregation (~99% token reduction):
 
 ```bash
-# Sessions by agent
-cass search "*" --json --aggregate agent
+# Sessions by agent (overview only — --limit 1 + --max-content-length suppress hit dump)
+cass search "*" --aggregate agent --limit 1 --max-content-length 100 --robot-format toon
 
-# Sessions by agent and workspace
-cass search "*" --json --aggregate agent,workspace --days 30
+# Sessions by agent + workspace
+cass search "*" --aggregate agent,workspace --days 30 --limit 1 --max-content-length 100 --robot-format toon
 
 # Error distribution by agent
-cass search "error" --json --aggregate agent --week
+cass search "error" --aggregate agent --week --limit 1 --max-content-length 100 --robot-format toon
 ```
+
+**Aggregate quirk:** `--aggregate` returns hits AND aggregations. Default unlimited hit list balloons output. Always pass `--limit 1` for true overview. `--fields` cannot combine with `--aggregate` (returns nothing); use `--max-content-length` instead.
 
 ## Analysis Workflows
 
@@ -163,7 +171,7 @@ cass health --json
 
 1. `cass analytics tokens --days 7 --group-by day --json` - daily token consumption
 2. `cass analytics tools --days 7 --limit 10 --json` - top tools used
-3. `cass search "*" --json --aggregate agent --week` - agent distribution
+3. `cass search "*" --aggregate agent --week --limit 1 --max-content-length 100 --robot-format toon` - agent distribution
 4. `cass timeline --since 7d --json --group-by day` - activity timeline
 
 ### Agent Comparison
@@ -198,4 +206,4 @@ Structure analytics output as:
 
 ## Additional Resources
 
-- **[Command Reference](../../references/command-reference.md)** - Complete CASS CLI v0.2.7 reference
+- **[Command Reference](../../references/command-reference.md)** - CASS CLI v0.3.x reference (hot-path commands inline; long-tail topics via `cass robot-docs <topic>`)

@@ -1,6 +1,6 @@
 # asragab-claude-marketplace
 
-A Claude Code plugin marketplace containing plugins for session search/analytics, skill evaluation, and Claude Code mod development.
+A Claude Code plugin marketplace containing plugins for session search/analytics, skill evaluation, Claude Code mod development, and a PR pane mod.
 
 ## Plugins
 
@@ -9,6 +9,7 @@ A Claude Code plugin marketplace containing plugins for session search/analytics
 | [cass](#cass) | 0.3.0 | Cross-agent session search, context, analytics, export, learnings, and **session resume** powered by CASS CLI |
 | [skill-eval](#skill-eval) | 1.0.0 | Automated skill/prompt/tool evaluation and improvement via session log analysis and autoresearch optimization |
 | [mod-forge](#mod-forge) | 0.1.0 | Build and verify Claude Code mods in isolated child processes, never in the live session (Claude Code 2.1.287+) |
+| [pr-pane](#pr-pane) | 0.1.0 | `/prs` toggles a pane of your open GitHub PRs with review state; arrows and Enter open one in the browser (Claude Code 2.1.287+, needs `gh`) |
 
 ## Installation
 
@@ -25,6 +26,7 @@ claude plugin marketplace add https://github.com/ASRagab/asragab-claude-marketpl
 claude plugin install cass
 claude plugin install skill-eval
 claude plugin install mod-forge
+claude plugin install pr-pane
 ```
 
 ### Prerequisites
@@ -32,6 +34,7 @@ claude plugin install mod-forge
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - [Bun runtime](https://bun.sh) (required by skill-eval scripts)
   - To run `bun run test`, first run `bun install` in `plugins/skill-eval/scripts` (installs `@anthropic-ai/sdk`).
+- [GitHub CLI](https://cli.github.com) (`gh`), logged in with `gh auth login` (required by pr-pane)
 - [CASS CLI](https://github.com/Dicklesworthstone/coding_agent_session_search) v0.3.0+ (required by cass plugin)
 
 ---
@@ -193,12 +196,28 @@ bash plugins/mod-forge/tests/live.test.sh
 
 ---
 
+## pr-pane
+
+A Claude Code mod for keeping your open pull requests one keystroke away. **Claude Code only**, version 2.1.287 or later.
+
+`/prs` toggles a pane listing every open PR you authored, across repositories. Each row starts with a state glyph, and the header legend counts them: `✗` changes requested, `✓` approved, `●` ready for review, `○` draft. Rows are grouped in that order. Arrow keys move the cursor and Enter opens the PR in your browser (`open` on macOS, `xdg-open` on Linux). Esc returns to the prompt.
+
+It needs no configuration. The GitHub user is whoever `gh` is logged in as, the list refreshes every 60 seconds and when you open the pane, and the status line shows the open PR count. If `gh` is missing or logged out, the pane says to run `gh auth login`. The list shows up to 100 PRs; the header shows the true total when there are more.
+
+```bash
+# Run the mod's tests (no network, no API key)
+claude plugin test plugins/pr-pane
+```
+
+---
+
 ## Uninstallation
 
 ```bash
 claude plugin uninstall cass
 claude plugin uninstall skill-eval
 claude plugin uninstall mod-forge
+claude plugin uninstall pr-pane
 
 # To remove the marketplace itself
 claude plugin marketplace remove asragab-claude-marketplace

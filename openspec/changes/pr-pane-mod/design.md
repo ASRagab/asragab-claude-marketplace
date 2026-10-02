@@ -16,7 +16,7 @@ Up to eight PRs appear per page, reduced when the available band height is small
 
 A Client was considered: its key listener requires click-acquired focus and cannot join the native Button/Input/Select focus ring. Native controls retain keyboard access with less code.
 
-For additional visual isolation, dim horizontal rules above and below the PR content would preserve transparency and cost two rows. This remains a suggestion pending user preference.
+Dim horizontal rules above and below the PR content span the available band width and preserve transparency. They cost two rows, accounted for when choosing the page size.
 
 ## Data and statuses
 
@@ -45,4 +45,4 @@ Browser opening tries macOS `open`, then Linux `xdg-open`, accepting HTTPS URLs 
 
 Claude Code 2.1.287 passed validation, 17 SDK tests, headless proof of load, and interactive rendering. The SDK tests cover statuses, sorting, paging, composition, refresh and failure retention, review-thread pagination, and browser opening. Typechecking passed; changing approved from blue to green made the rendered-color tests fail.
 
-An isolated terminal session verified show/hide/show, arrows, page focus, all three exclusive sort shortcuts, Enter with `open` exit 0, and Esc. Its captured PR rows emitted red, blue and orange foregrounds with no explicit band background colors. Native Warp translucency was confirmed by the user for the preceding band implementation; the updated colors remain available for their visual inspection.
+An isolated terminal session verified show/hide/show, arrows, page focus, all three exclusive sort shortcuts, Enter with `open` exit 0, and Esc. Its captures showed the two dim separator rules and red, blue and orange PR foregrounds with no explicit band background colors. Native Warp translucency was confirmed by the user for the preceding band implementation; the updated colors and separators remain available for their visual inspection.

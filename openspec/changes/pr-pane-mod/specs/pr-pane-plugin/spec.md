@@ -22,7 +22,7 @@ The mod SHALL register a `/prs` slash command that shows the pull request band a
 - **THEN** the band remains visible
 
 ### Requirement: Preserve the default background and other band output
-The mod SHALL render the picker at AbovePrompt without setting `backgroundColor` on its Box or Text elements, SHALL preserve downstream render output from `next(e)`, and SHALL yield while `hasSurvey` is true.
+The mod SHALL render the picker at AbovePrompt without setting `backgroundColor` on its Box or Text elements, SHALL surround its content with dim horizontal rules spanning the available band width, SHALL preserve downstream render output from `next(e)`, and SHALL yield while `hasSurvey` is true. The page size SHALL account for the two separator rows.
 
 #### Scenario: Other mod renders AbovePrompt
 - **WHEN** another mod provides AbovePrompt output

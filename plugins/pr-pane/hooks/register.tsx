@@ -95,7 +95,7 @@ export const register: Register = on => {
     const v = await read($, view)
     const by = await read($, sort)
     const prs = sorted(v.prs, by)
-    const size = Math.max(1, Math.min(8, e.props.maxRows - 5 - (v.error ? 1 : 0)))
+    const size = Math.max(1, Math.min(8, e.props.maxRows - 7 - (v.error ? 1 : 0)))
     const pages = Math.max(1, Math.ceil(prs.length / size))
     const current = Math.min(await read($, page), pages - 1)
     const shown = prs.slice(current * size, (current + 1) * size)
@@ -109,8 +109,10 @@ export const register: Register = on => {
       await update($, sort, () => to)
     }
     const at = v.updatedAt ? new Date(v.updatedAt).toTimeString().slice(0, 5) : undefined
+    const rule = '─'.repeat(Math.max(0, e.props.bodyColumns))
     return (
       <Box flexDirection="column">
+        <Text dimColor wrap="truncate-end">{rule}</Text>
         <Text bold>
           {v.login ? `@${v.login}` : 'GitHub'} · {v.total} open
           {v.total > v.prs.length ? ` (showing ${v.prs.length})` : ''}
@@ -148,6 +150,7 @@ export const register: Register = on => {
           </Box>
         )}
         <Text dimColor>Ctrl+X then Tab focuses · ↑/↓ or Tab move · Enter opens · r/s/d sort · p/n page · Esc prompt · /prs hides</Text>
+        <Text dimColor wrap="truncate-end">{rule}</Text>
         {theirs}
       </Box>
     )

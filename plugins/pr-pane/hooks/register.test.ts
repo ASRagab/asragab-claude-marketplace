@@ -324,7 +324,7 @@ test('sort controls select one mode, order rows and reset paging', async ($, on)
   expect((await ui.find({ key: 'sort:date' }))?.props.label).toBe('[date]')
   expect((await ui.find({ key: 'sort:repo' }))?.props.label).toBe('repo')
   await ui.redraw({ ...band, maxRows: 8 })
-  expect((await keys()).length).toBe(3)
+  expect((await keys()).length).toBe(1)
   expect((await ui.findAll({ type: 'Text' })).some(t => t.props.backgroundColor !== undefined)).toBe(false)
 })
 

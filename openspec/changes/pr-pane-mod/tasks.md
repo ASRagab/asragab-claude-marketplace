@@ -25,5 +25,5 @@
 - [x] 5.1 Classify unresolved review threads and active requested changes as feedback, ahead of approval; paginate review threads when needed and retain last good data on failure
 - [x] 5.2 Color the full PR description red for feedback, blue for approval, orange for needs review, and dim for drafts, using native Buttons beside Text
 - [x] 5.3 Add a single repository/status/date sort choice, descending last-updated time within groups, and eight-row paging
-- [x] 5.4 Remove the redundant warning-styled footer count; retain the count, refresh time and errors in the band; investigate separators and recommend dim horizontal rules
+- [x] 5.4 Remove the redundant warning-styled footer count; retain the count, refresh time and errors in the band; add dim horizontal rules above and below the content with page height adjusted
 - [x] 5.5 Pass validate, 17 SDK tests, headless and interactive stages, generated-type checking, and a color mutation check; inspect live foreground/background output and exercise keyboard sorting, paging and browser opening

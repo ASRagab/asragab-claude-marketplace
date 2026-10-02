@@ -204,6 +204,8 @@ A Claude Code mod for keeping your open pull requests one keystroke away. **Clau
 
 Press Ctrl+X, then Tab to focus the band; arrows or Tab move between controls and Enter opens a PR in your browser (`open` on macOS, `xdg-open` on Linux). While the band has focus, `r` sorts by repository, `s` by status, and `d` by last-updated date. One sort mode is active at a time; repository/status groups use newest-updated first. The default status order is feedback, approved, needs review, draft. Up to eight rows appear per page; `p`/`n` switch pages. If other band output makes the drawing overflow, arrows scroll and Tab still moves focus. Esc returns to the prompt and leaves the band visible; `/prs` hides it. The band sets no background color and yields while a survey is active.
 
+Dim horizontal rules above and below the PR content visually separate it while preserving the default background. Smaller bands reduce the page size to leave room for the rules.
+
 It needs no configuration. The GitHub user is whoever `gh` is logged in as. Background polling runs at startup, every 60 seconds, and when you show the band; updates normally appear within a minute plus API latency. The header shows the open PR count and last successful refresh time. A failed refresh keeps the last good list and shows the error in the band. If `gh` is missing or logged out, it says to run `gh auth login`. The list includes the 100 most recently updated PRs; the header shows the true total when there are more.
 
 ```bash

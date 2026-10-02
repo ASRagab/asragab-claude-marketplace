@@ -1,0 +1,17 @@
+{
+  "name": "mod-forge",
+  "version": "0.1.0",
+  "description": "Build and verify Claude Code mods in isolated child processes, never in the live session.",
+  "author": {
+    "name": "ASRagab",
+    "url": "https://github.com/ASRagab"
+  },
+  "repository": "https://github.com/ASRagab/asragab-claude-marketplace",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mods",
+    "testing",
+    "harness"
+  ]
+}

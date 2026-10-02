@@ -1,6 +1,6 @@
 # asragab-claude-marketplace
 
-A Claude Code plugin marketplace containing plugins for session search/analytics and skill evaluation.
+A Claude Code plugin marketplace containing plugins for session search/analytics, skill evaluation, and Claude Code mod development.
 
 ## Plugins
 
@@ -8,6 +8,7 @@ A Claude Code plugin marketplace containing plugins for session search/analytics
 |--------|---------|-------------|
 | [cass](#cass) | 0.3.0 | Cross-agent session search, context, analytics, export, learnings, and **session resume** powered by CASS CLI |
 | [skill-eval](#skill-eval) | 1.0.0 | Automated skill/prompt/tool evaluation and improvement via session log analysis and autoresearch optimization |
+| [mod-forge](#mod-forge) | 0.1.0 | Build and verify Claude Code mods in isolated child processes, never in the live session (Claude Code 2.1.287+) |
 
 ## Installation
 
@@ -23,12 +24,14 @@ claude plugin marketplace add https://github.com/ASRagab/asragab-claude-marketpl
 # Install by name (use plugin@marketplace to disambiguate)
 claude plugin install cass
 claude plugin install skill-eval
+claude plugin install mod-forge
 ```
 
 ### Prerequisites
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - [Bun runtime](https://bun.sh) (required by skill-eval scripts)
+  - To run `bun run test`, first run `bun install` in `plugins/skill-eval/scripts` (installs `@anthropic-ai/sdk`).
 - [CASS CLI](https://github.com/Dicklesworthstone/coding_agent_session_search) v0.3.0+ (required by cass plugin)
 
 ---
@@ -171,11 +174,31 @@ bun scripts/autoresearch-loop.ts -t targets.jsonl --max-rounds 10
 
 ---
 
+## mod-forge
+
+Build and verify Claude Code mods without touching the session you are working in. **Claude Code only**, version 2.1.287 or later.
+
+The `build-claude-mod` skill sends an agent through `scripts/run-mod.sh`, which runs a mod through four fail-fast stages (`validate`, `test`, `headless`, `interactive`) in separate processes under a harness-owned `CLAUDE_CONFIG_DIR`. See [plugins/mod-forge/README.md](plugins/mod-forge/README.md) for stages, evidence files, and exit codes.
+
+Requires `jq`. Live stages also need `ANTHROPIC_API_KEY`, and the interactive stage needs `tmux`.
+
+```bash
+# Offline test: no model calls, no API key
+bun run test:mod-forge
+
+# Live test: starts real claude children and makes real model calls
+# (about $0.01 to $0.03 per headless run). Needs ANTHROPIC_API_KEY and tmux.
+bash plugins/mod-forge/tests/live.test.sh
+```
+
+---
+
 ## Uninstallation
 
 ```bash
 claude plugin uninstall cass
 claude plugin uninstall skill-eval
+claude plugin uninstall mod-forge
 
 # To remove the marketplace itself
 claude plugin marketplace remove asragab-claude-marketplace

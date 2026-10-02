@@ -1,0 +1,5 @@
+{
+  "name": "loop-probe",
+  "version": "0.1.0",
+  "description": "Throwaway probe that proves the mod build and test loop"
+}

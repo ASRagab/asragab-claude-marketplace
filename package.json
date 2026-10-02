@@ -3,7 +3,8 @@
   "scripts": {
     "test": "bun test tests/",
     "test:unit": "bun test tests/skill-eval/unit/",
-    "check": "cd plugins/skill-eval/scripts && bunx tsc --noEmit"
+    "check": "cd plugins/skill-eval/scripts && bunx tsc --noEmit",
+    "test:mod-forge": "bash plugins/mod-forge/tests/harness-offline.test.sh"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0"

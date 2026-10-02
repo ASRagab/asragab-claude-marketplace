@@ -4,6 +4,14 @@ import { counts, parse, row, stateOf } from './prs'
 
 const start = { cwd: '/run', surface: 'terminal', isInteractive: true } as const
 const ack = { value: undefined } as never
+const band = {
+  hasSurvey: false,
+  isWorking: false,
+  maxRows: 20,
+  bodyColumns: 100,
+  scroll: { offset: 0, bodyRows: 20 },
+  view: {},
+} as const
 
 const node = (n: number, isDraft: boolean, reviewDecision: string | null) => ({
   number: n,
@@ -139,30 +147,63 @@ test('the list refreshes every 60 seconds', async ($, on) => {
   expect(queries).toBe(2)
 })
 
-test('/prs opens the pane when closed and closes it when open', async ($, on) => {
+test('/prs shows and hides the PR picker in the band without opening a pane', async ($, on) => {
   const log: string[] = []
-  let isUp = false
 
   mock.env(on, {})
   const clock = mock.clock(on)
-  on('process.run', async (_$, e) => (e.argv[2] === 'user' ? done('me\n') : done(graphql())))
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => $.ui.resolve(e).Box({ children: [] }))
+  on('process.run', async (_$, e) => (e.argv[2] === 'user' ? done('me\n') : done(graphql(node(1, false, null)))))
   on('ui.status', async () => ack)
-  on('ui.panes', async () => ({ value: isUp ? [{ id: 'prs', title: 'Open PRs', isShown: true, isFocused: true, isPlaced: true }] : [] }))
   on('ui.open', async (_$, e) => {
-    log.push(`open ${e.id} focus=${e.focus}`)
-    isUp = true
+    log.push(`open ${e.id}`)
     return { value: { isPlaced: true } }
   })
   on('ui.close', async (_$, e) => {
     log.push(`close ${e.id}`)
-    isUp = false
     return ack
   })
 
+  const ui = await $.ui.mount({ plugin: 'pr-pane', surface: 'terminal', component: 'AbovePrompt', props: band })
+  expect(await ui.find({ key: 'prs' })).toBeUndefined()
   await $.command.run({ command: 'prs', args: '' } as never)
+  await clock.advance(0)
+  await ui.redraw(band)
+  expect(await ui.find({ key: 'prs' })).toBeDefined()
   await $.command.run({ command: 'prs', args: '' } as never)
+  await ui.redraw(band)
+  expect(await ui.find({ key: 'prs' })).toBeUndefined()
+  expect(log).toEqual([])
+})
 
-  expect(log).toEqual(['open prs focus=true', 'close prs'])
+test('the PR band preserves other mods and yields to a survey without losing visibility', async ($, on) => {
+  mock.env(on, {})
+  const clock = mock.clock(on)
+  on('process.run', async (_$, e) => (e.argv[2] === 'user' ? done('me\n') : done(graphql(node(1, false, null)))))
+  on('ui.status', async () => ack)
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    return Box({ children: [
+      Text({ children: ['another mod'] }),
+      Button({ key: 'other', label: 'Another mod', autoFocus: true, onPress: () => {} }),
+    ] })
+  })
+
+  const ui = await $.ui.mount({ plugin: 'pr-pane', surface: 'terminal', component: 'AbovePrompt', props: band })
+  expect(await ui.find({ text: 'another mod' })).toBeDefined()
+  await $.command.run({ command: 'prs', args: '' } as never)
+  await clock.advance(0)
+  await ui.redraw(band)
+  expect(await ui.find({ text: 'another mod' })).toBeDefined()
+  expect(await ui.find({ key: 'prs' })).toBeDefined()
+  const autofocus = (await ui.findAll({})).filter(e => e.props.autoFocus === true)
+  expect(autofocus.map(e => e.key)).toEqual(['prs', 'other'])
+
+  await ui.redraw({ ...band, hasSurvey: true })
+  expect(await ui.find({ text: 'another mod' })).toBeDefined()
+  expect(await ui.find({ key: 'prs' })).toBeUndefined()
+  await ui.redraw(band)
+  expect(await ui.find({ key: 'prs' })).toBeDefined()
 })
 
 test('a failed refresh keeps the last list; the status reports the true total, not the page size', async ($, on) => {
@@ -172,6 +213,7 @@ test('a failed refresh keeps the last list; the status reports the true total, n
 
   mock.env(on, {})
   const clock = mock.clock(on)
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => $.ui.resolve(e).Box({ children: [] }))
   on('session.start', async (_$, e) => ({ cwd: e.cwd }))
   on('command.register', async (_$, e) => ({ value: { command: e.name } }) as never)
   on('process.run', async (_$, e) => {
@@ -197,22 +239,23 @@ test('a failed refresh keeps the last list; the status reports the true total, n
 
   expect(statuses).toEqual(['PRs: 58 open', 'PRs: unavailable'])
 
+  await $.command.run({ command: 'prs', args: '' } as never)
   await $.ui.mount({
     plugin: 'pr-pane',
     surface: 'terminal',
-    component: 'Pane',
-    props: { title: 'Open PRs', isFocused: true, bodyColumns: 100 } as never,
-    requestId: 'prs',
+    component: 'AbovePrompt',
+    props: band,
   })
   await $.ui.select({ plugin: 'pr-pane', key: 'prs', value: 'https://github.com/o/r/pull/7' })
   expect(opened).toEqual([['open', 'https://github.com/o/r/pull/7']])
 })
 
-test('picking a row in the drawn pane opens that PR in the browser', async ($, on) => {
+test('picking a row in the drawn band opens that PR in the browser', async ($, on) => {
   const opened: string[][] = []
 
   mock.env(on, {})
   const clock = mock.clock(on)
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => $.ui.resolve(e).Box({ children: [] }))
   on('session.start', async (_$, e) => ({ cwd: e.cwd }))
   on('command.register', async (_$, e) => ({ value: { command: e.name } }) as never)
   on('process.run', async (_$, e) => {
@@ -226,12 +269,12 @@ test('picking a row in the drawn pane opens that PR in the browser', async ($, o
 
   await $.session.start(start)
   await clock.advance(0)
+  await $.command.run({ command: 'prs', args: '' } as never)
   await $.ui.mount({
     plugin: 'pr-pane',
     surface: 'terminal',
-    component: 'Pane',
-    props: { title: 'Open PRs', isFocused: true, bodyColumns: 100 } as never,
-    requestId: 'prs',
+    component: 'AbovePrompt',
+    props: band,
   })
   await $.ui.select({ plugin: 'pr-pane', key: 'prs', value: 'https://github.com/o/r/pull/2' })
 

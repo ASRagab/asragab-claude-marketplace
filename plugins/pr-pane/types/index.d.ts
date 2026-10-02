@@ -12,6 +12,6 @@ export type View = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'pr-pane': { view: View }
+    'pr-pane': { view: View; visible: boolean }
   }
 }

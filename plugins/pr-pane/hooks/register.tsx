@@ -4,7 +4,6 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { PrState, View } from '../types'
 import { GLYPH, QUERY, SHORT, counts, parse, row, total } from './prs'
 
-const PANE = 'prs'
 const REFRESH_MS = 60_000
 const COLOR: Record<PrState, string | undefined> = {
   'changes requested': 'red',
@@ -13,6 +12,7 @@ const COLOR: Record<PrState, string | undefined> = {
   draft: undefined,
 }
 const view = atom({ plugin: 'pr-pane', key: 'view' } as const, { prs: [], total: 0 } as View)
+const visible = atom({ plugin: 'pr-pane', key: 'visible' } as const, false)
 
 const gh = async ($: EngineInterface, args: string[], failure: string): Promise<string> => {
   const ran = await $.process
@@ -61,7 +61,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const marker = await $.env.get('MOD_FORGE_MARKER')
     if (marker) await $.fs.write(marker, 'loaded')
-    await $.command.register({ name: 'prs', description: 'Toggle the open pull requests pane' })
+    await $.command.register({ name: 'prs', description: 'Toggle open pull requests above the prompt' })
     const started = await next(e)
     void refresh($)
     $.clock.every(REFRESH_MS, () => void refresh($))
@@ -69,16 +69,15 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'prs' }, async $ => {
-    if ((await $.ui.panes()).some(p => p.id === PANE)) {
-      await $.ui.close({ id: PANE })
-      return { text: 'PR pane closed.' }
-    }
-    await $.ui.open({ id: PANE, title: 'Open PRs', focus: true, closeOnEscape: true, columns: 110 })
-    void refresh($)
-    return { text: 'PR pane opened.' }
+    const isVisible = !(await read($, visible))
+    await update($, visible, () => isVisible)
+    if (isVisible) void refresh($)
+    return { text: isVisible ? 'PR list shown above the prompt.' : 'PR list hidden.' }
   })
 
-  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey || !(await read($, visible))) return next(e)
+    const theirs = await next(e)
     const t = $.ui.resolve(e)
     const { Box, Text } = t
     const v = await read($, view)
@@ -101,21 +100,17 @@ export const register: Register = on => {
         {v.prs.length === 0 && !v.error && (
           <Text dimColor>{v.updatedAt ? 'No open PRs.' : 'Loading...'}</Text>
         )}
-        {/* mobile draws no Select: list the rows without a cursor */}
-        {'Select' in t ? (
-          v.prs.length > 0 && (
-            <t.Select
-              key="prs"
-              autoFocus
-              label="Selected"
-              options={v.prs.map(p => ({ value: p.url, label: row(p, v.prs) }))}
-              onSelect={url => void openUrl($, url)}
-            />
-          )
-        ) : (
-          v.prs.map(p => <Text>{row(p, v.prs)}</Text>)
+        {'Select' in t && v.prs.length > 0 && (
+          <t.Select
+            key="prs"
+            autoFocus
+            label="Selected"
+            options={v.prs.map(p => ({ value: p.url, label: row(p, v.prs) }))}
+            onSelect={url => void openUrl($, url)}
+          />
         )}
-        <Text dimColor>up/down move · Enter opens in browser · Esc back to prompt · /prs closes</Text>
+        <Text dimColor>Ctrl+X then Tab focuses · up/down move · Enter opens · Esc back to prompt · /prs hides</Text>
+        {theirs}
       </Box>
     )
   })

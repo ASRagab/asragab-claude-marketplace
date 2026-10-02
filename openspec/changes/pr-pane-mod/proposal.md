@@ -7,18 +7,19 @@ Open pull requests in flight are scattered across repositories, and checking the
 ## What Changes
 
 - Add a Claude Code mod, `pr-pane`, built and verified through the `mod-forge` loop.
-- The mod registers a `/prs` slash command that toggles a pane listing every open PR authored by the authenticated GitHub user.
+- The mod registers a `/prs` slash command that toggles a band above the prompt listing every open PR authored by the authenticated GitHub user.
 - Each row shows the PR state: draft, ready for review, approved, or changes requested.
-- The user moves a cursor over the rows with the arrow keys and presses Enter to open the PR in the default browser.
+- The user presses Ctrl+X, then Tab to focus the band, moves a cursor over the rows with the arrow keys, and presses Enter to open the PR in the default browser. Esc returns to the prompt; `/prs` hides the band.
+- The band sets no background color, yields during surveys, and preserves other mods' AbovePrompt output.
 - The list refreshes on a timer and on demand while the session runs.
-- The mod validates the GitHub identity through the `gh` CLI at session start and shows a plain instruction in the pane when `gh` is missing or logged out.
-- The status line shows the open PR count so the state is visible with the pane closed.
+- The mod validates the GitHub identity through the `gh` CLI at session start and shows a plain instruction in the band when `gh` is missing or logged out.
+- The status line shows the open PR count so the state is visible with the band hidden.
 - No configuration is required.
 
 ## Capabilities
 
 ### New Capabilities
-- `pr-pane-plugin`: a Claude Code mod that shows the user's open GitHub PRs and their review state in a toggleable pane, with keyboard navigation to the browser and automatic refresh.
+- `pr-pane-plugin`: a Claude Code mod that shows the user's open GitHub PRs and their review state in a toggleable AbovePrompt band, with keyboard navigation to the browser and automatic refresh.
 
 ### Modified Capabilities
 

@@ -7,13 +7,14 @@
 
 ## 2. Mod wiring
 
-- [x] 2.1 Register `/prs` toggle, the pane `ui.render` hook with a `Select` cursor, the 60 second refresh, and the status line count; verify with tests for toggle open/close, periodic refresh using the mock clock, and Enter opening the URL through the stubbed process
+- [x] 2.1 Register `/prs` visibility toggle and the AbovePrompt `ui.render` hook with the existing `Select`, the 60 second refresh, and the status line count; verify hidden/visible rendering, survey yielding, downstream composition and autofocus order, no pane calls or explicit background colors, periodic refresh, and Enter opening the URL through the stubbed process
 - [x] 2.2 Add the `MOD_FORGE_MARKER` proof of load in `session.start`; verify the headless stage passes
 
 ## 3. Verification
 
-- [x] 3.1 Run `run-mod.sh --stages validate,test,headless,interactive --expect "PRs"` and verify every stage passes
-- [x] 3.2 Open the pane in an isolated interactive session and confirm the rows draw and the arrow keys move the highlight (done in a scripted tmux session; Enter-to-browser is covered only by a test with a stubbed `open`, not live)
+- [x] 3.1 Rerun `run-mod.sh --stages validate,test,headless,interactive --expect "PRs"` for the band implementation and verify every stage passes
+- [x] 3.2 Show the band in an isolated interactive session and confirm the rows draw, Ctrl+X then Tab focuses the Select, arrows move the highlight, Esc returns to the prompt while leaving the band visible, and `/prs` hides and shows it; Enter was pressed live and `open` exited 0, while the SDK test verifies the exact selected URL
+- [ ] 3.3 Inspect the band in native Warp with the user's translucent default background; blocked by the computer-use tool's safety check, so native visual transparency remains unverified
 
 ## 4. Promotion (only when the user asks)
 

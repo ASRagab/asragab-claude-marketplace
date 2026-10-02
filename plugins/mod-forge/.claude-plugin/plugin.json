@@ -1,6 +1,6 @@
 {
   "name": "mod-forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Build and verify Claude Code mods in isolated child processes, never in the live session.",
   "author": {
     "name": "ASRagab",

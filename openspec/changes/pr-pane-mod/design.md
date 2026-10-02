@@ -1,67 +1,48 @@
 # Design
 
-## Context
+## Context and goals
 
-See proposal.md for motivation. A Claude Code mod is a plugin whose `hooks/hooks.json` lists one function-hook module. The API is documented by the declaration file the engine writes (`claude-code.d.ts`, build 2.1.287), which this design follows. Mods are built and verified through `mod-forge`, not in the live session.
+Claude Code 2.1.287 fills docked panes with `#262626`; Warp renders that explicit background opaquely. Its AbovePrompt renderer has no corresponding fill, so `/prs` toggles a band using default backgrounds. The user confirmed native Warp translucency after this change. The mod lists authored open PRs and opens them in the browser, without GitHub writes or configuration.
 
-Facts taken from the declarations:
+The installed declarations and [official keyboard documentation](https://code.claude.com/docs/en/plugins/mods/interface#what-each-key-does) define the rendering and focus contracts. Validation uses isolated mod-forge processes, never the user's live session.
 
-- An AbovePrompt band is drawn by a `ui.render` hook on `{ component: 'AbovePrompt' }`; it does not need `$.ui.open` or `$.ui.close`.
-- AbovePrompt is raised on the terminal surface only.
-- Ctrl+X, then Tab moves keyboard focus from the prompt into a band. A focused `Select` moves with the arrows and picks with Enter; Esc returns focus to the prompt.
-- `hasSurvey` signals an active survey, during which the PR band yields. `await next(e)` obtains other mods' render output for composition.
-- `$.process.run(argv)` runs a command with no shell and resolves `{ exitCode, stdout, stderr }`. It is available in the CLI only.
-- `$.clock.every(ms, fn)` runs `fn` on a timer. `$.ui.status(text)` sets the status line.
-- Values a drawing reads live in `atom(...)` state; `read` is called while drawing and `update` from handlers.
-- A `Link` element is `https:` only and bounded, so it is not the primary way to open a URL here.
+## Rendering and keyboard controls
 
-## Goals / Non-Goals
+Visibility is a plugin-keyed atom, initially hidden. The AbovePrompt hook preserves `await next(e)` and yields during surveys. Box and Text omit `backgroundColor`.
 
-**Goals:**
-- One command toggles a band above the prompt with the user's open PRs and their review state.
-- Arrow keys and Enter reach the browser.
-- No configuration; identity comes from `gh`.
-- Avoid the docked pane's explicit background fill so the band can use Warp's default translucent background.
+Native Select accepts only plain string labels. Native Button cannot color its label or accept styled children. Each row therefore uses a small plain Button (`›`) beside a colored Text containing the full `glyph repo#number title` description. The owner appears only when short repository names collide. The first row has autofocus; Ctrl+X then Tab hands the band the keyboard. Arrows or Tab move between native controls, Enter opens a PR, and Esc returns to the prompt without hiding the band. If composed output overflows the band, arrows scroll and Tab still moves focus.
 
-**Non-Goals:**
-- PRs the user is only a reviewer on, merging, commenting, or any write to GitHub.
-- Organisation filters, sorting options, notifications, or persistence across sessions.
-- Windows support for opening the browser.
+Up to eight PRs appear per page, reduced when the available band height is smaller. Previous/Next buttons have `p`/`n` shortcuts. Page changes request focus on the first new row; this is best effort because focus remains the person's to give. Sort buttons use `r`/`s`/`d`, with one active mode: repository, status, or last-updated date. Repository/status sorts use descending updated time within each group. Status order is feedback, approved, needs review, draft. Date means GitHub `updatedAt`; the query requests `sort:updated-desc` so the newest PRs remain included at the 100-row limit.
 
-## Decisions
+A Client was considered: its key listener requires click-acquired focus and cannot join the native Button/Input/Select focus ring. Native controls retain keyboard access with less code.
 
-**AbovePrompt band toggled by `/prs`.** Visibility lives in a plugin-keyed reactive atom, initially hidden, so it survives a module reload. The command changes that atom and refreshes on show; it makes no pane open or close calls. Prompt focus stays with the engine until the user presses Ctrl+X, then Tab. Esc returns focus to the prompt without hiding the band; `/prs` hides it.
+For additional visual isolation, dim horizontal rules above and below the PR content would preserve transparency and cost two rows. This remains a suggestion pending user preference.
 
-**Compose with other mods and yield during surveys.** The AbovePrompt renderer calls `await next(e)` and retains that output when adding the PR band. When hidden or `hasSurvey` is true, it returns the downstream output alone. BelowPrompt is not used for the interactive picker.
+## Data and statuses
 
-**One `Select` for the cursor.** Arrows move and Enter picks inside the existing `Select`, which is the documented keyboard-cursor element. A row of Buttons would need Tab to move. The band uses the prompt area's available width. The existing Select keeps the PR rows and Enter-to-browser handler; band focus is checked in an isolated interactive session.
+`gh api user --jq .login` verifies identity. GraphQL searches `is:pr is:open author:@me archived:false sort:updated-desc` for up to 100 PRs, returning the true total, repository, URL, draft flag, review decision, updated time, and review thread resolution state.
 
-**Data from one `gh api graphql` search.** `gh search prs --json` has no review-decision field. The GraphQL `search` query returns `isDraft`, `reviewDecision`, the URL and the repository in one call: `is:pr is:open author:@me archived:false`. State mapping: draft first, then CHANGES_REQUESTED, APPROVED, and everything else (REVIEW_REQUIRED or none) as ready for review.
+Status precedence:
 
-**Identity from `gh`.** `gh api user --jq .login` is the identity check. A non-zero exit or a missing binary produces one stored error string shown in the band. This is the same credential source `gh` uses everywhere (stored login or `GH_TOKEN`).
+1. Draft: dim text, regardless of reviews.
+2. Active `CHANGES_REQUESTED` decision or an unresolved review thread: red comments/changes.
+3. `APPROVED` without unresolved feedback: blue approved.
+4. Otherwise: orange needs review.
 
-**Refresh on a 60 second `$.clock.every`, plus on show.** A refresh runs `gh`, then writes an atom; `ui.render` only reads it and never runs processes. A failed refresh keeps the last good list and sets an error note. A refresh in flight blocks a second one so slow calls do not stack.
+Resolved and historical comments do not count. Unresolved threads are not filtered by author, bot, or outdated state. GitHub provides no unresolved-only thread filter. When the first 100 threads are all resolved and more exist, follow cursor pages until unresolved feedback is found or the connection is exhausted. Already-red and draft PRs need no additional pages. A failed or incomplete page aborts the refresh, preserving the last good data.
 
-**Browser through `open` (macOS), `xdg-open` on Linux.** Chosen over a `Link` element because Enter on a `Select` pick must open it. The mod tries `open` first and falls back to `xdg-open` when `open` is missing or fails; if both fail it shows a toast with the URL.
+References: [PullRequest](https://docs.github.com/en/graphql/reference/objects#pullrequest), [PullRequestReviewThread](https://docs.github.com/en/graphql/reference/objects#pullrequestreviewthread), [pagination](https://docs.github.com/en/graphql/guides/using-pagination-in-the-graphql-api), [rate limits](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api). A live query returned 61 PRs for one point; additional thread pages add calls when necessary.
 
-**Status line shows the count.** `$.ui.status` gives a signal even while the band is hidden and lets the mod-forge interactive harness check the mod without typing `/prs`.
+## Refresh, count and errors
 
-**Compact rows with a colored legend.** A `Select` label is one plain string, so per-row color is not possible. Each row is `glyph repo#N title` (no repeated state word, owner dropped unless two repos share a name) and the state is named once in a colored legend line under the header. Rows are grouped changes requested, approved, ready, draft. Alternative considered: draw rows and a cursor ourselves with a `Client` element and `surface.onKey` for per-row color. Deferred: more code for a cosmetic gain.
+Fetch at startup, every 60 seconds, and on show. Drawing reads atoms and never runs processes. A module-level busy guard prevents overlapping refreshes. Failures preserve the last successful list and timestamp and show an error in the band. These are polling updates, normally visible within one minute plus API latency.
 
-**Background.** Claude Code 2.1.287 fills docked panes with `#262626` (`48;2;38;38;38`), while its AbovePrompt band renderer has no corresponding background fill. Warp renders explicit background colors opaquely and its default background translucently. The PR band's `Box` and `Text` elements therefore omit `backgroundColor`. This avoids the pane fill by moving the picker to the band; native Warp transparency still requires a visual check. Native inspection was blocked by the computer-use tool's safety check, so terminal rendering evidence does not establish that visual result.
+The count and refresh time belong in the band header. `$.ui.status` cannot choose a color or icon: the installed pinned-notice renderer prepends the warning symbol and defaults to warning color even for event notices. Clear the old status at startup and do not publish the count to that footer.
 
-**`Select` header.** With no initial `value`, the collapsed header starts at `Selected: none` and shows the selected row after a pick. The open list holds only PR rows.
-
-**No `Client` element.** The existing Select handles keyboard navigation without introducing a separate cursor or mouse-dependent key listener.
-
-## Risks / Trade-offs
-
-- [`search` returns at most 100 PRs per call] → The query asks for 100 and reads `issueCount`; the status line and header show the true total, and the header adds `(showing 100)` when the page is smaller than the total. No pagination.
-- [The `Select` shows about eight rows at a time and ends with `… N more`] → Accepted; the highlight scrolls the list.
-- [`gh` rate limits or network failure] → Keep the last list, show the failure, retry on the next tick.
-- [The mod-forge interactive stage cannot type `/prs`] → The stage checks the status line; a separate isolated terminal session checks `/prs`, Ctrl+X then Tab, arrows, Esc, and hide/show.
-- [Native Warp inspection is blocked] → Record the gap explicitly; do not claim visual transparency from ANSI or terminal-emulator checks alone.
+Browser opening tries macOS `open`, then Linux `xdg-open`, accepting HTTPS URLs only. Failure displays a toast. Windows opening and search pagination beyond 100 PRs remain outside scope.
 
 ## Verification
 
-Claude Code 2.1.287 passed mod-forge's validate, test (11 SDK tests), headless, and interactive stages. Typechecking against its generated declarations passed; changing the render matcher back to Pane made the band tests fail. An isolated terminal session verified show/hide/show, Ctrl+X then Tab focus, arrow navigation, Enter (`open` exited 0), and Esc returning to the prompt. Captured band rows emitted no explicit background-color SGRs; the selected row used inverse SGR 7. Native Warp appearance remains unverified.
+Claude Code 2.1.287 passed validation, 17 SDK tests, headless proof of load, and interactive rendering. The SDK tests cover statuses, sorting, paging, composition, refresh and failure retention, review-thread pagination, and browser opening. Typechecking passed; changing approved from blue to green made the rendered-color tests fail.
+
+An isolated terminal session verified show/hide/show, arrows, page focus, all three exclusive sort shortcuts, Enter with `open` exit 0, and Esc. Its captured PR rows emitted red, blue and orange foregrounds with no explicit band background colors. Native Warp translucency was confirmed by the user for the preceding band implementation; the updated colors remain available for their visual inspection.

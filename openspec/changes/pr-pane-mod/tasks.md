@@ -14,8 +14,16 @@
 
 - [x] 3.1 Rerun `run-mod.sh --stages validate,test,headless,interactive --expect "PRs"` for the band implementation and verify every stage passes
 - [x] 3.2 Show the band in an isolated interactive session and confirm the rows draw, Ctrl+X then Tab focuses the Select, arrows move the highlight, Esc returns to the prompt while leaving the band visible, and `/prs` hides and shows it; Enter was pressed live and `open` exited 0, while the SDK test verifies the exact selected URL
-- [ ] 3.3 Inspect the band in native Warp with the user's translucent default background; blocked by the computer-use tool's safety check, so native visual transparency remains unverified
+- [x] 3.3 Inspect the band in native Warp with the user's translucent default background; user screenshot confirms translucency is maintained
 
 ## 4. Promotion (only when the user asks)
 
 - [x] 4.1 Copy the mod to `plugins/pr-pane/`, register it in `marketplace.json`, document install and the `gh` requirement in the README, and verify the marketplace tests pass
+
+## 5. Status and sorting tweaks
+
+- [x] 5.1 Classify unresolved review threads and active requested changes as feedback, ahead of approval; paginate review threads when needed and retain last good data on failure
+- [x] 5.2 Color the full PR description red for feedback, blue for approval, orange for needs review, and dim for drafts, using native Buttons beside Text
+- [x] 5.3 Add a single repository/status/date sort choice, descending last-updated time within groups, and eight-row paging
+- [x] 5.4 Remove the redundant warning-styled footer count; retain the count, refresh time and errors in the band; investigate separators and recommend dim horizontal rules
+- [x] 5.5 Pass validate, 17 SDK tests, headless and interactive stages, generated-type checking, and a color mutation check; inspect live foreground/background output and exercise keyboard sorting, paging and browser opening

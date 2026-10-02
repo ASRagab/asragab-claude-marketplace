@@ -35,17 +35,38 @@ In `session.start`, the mod reads the environment variable `MOD_FORGE_MARKER` an
 ## Run the loop
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/run-mod.sh" [--stages validate,test,headless,interactive] [--expect TEXT] <mod-dir>
+"${CLAUDE_PLUGIN_ROOT}/scripts/run-mod.sh" [--stages validate,test,headless,typecheck,interactive] [--expect TEXT] [--script FILE] [--cols N] [--rows N] <mod-dir>
 ```
 
-Stages run in order and stop at the first failure. Each prints an evidence path; read those files instead of guessing. Exit `0` passed, `1` a stage failed, `2` a precondition is missing (read the message; the usual causes are no `ANTHROPIC_API_KEY` or no `tmux`). Do not work around a missing precondition by skipping the stage.
+Stages run in order and stop at the first failure. Each prints an evidence path; read those files instead of guessing. Exit `0` passed, `1` a stage failed, `2` a precondition is missing (read the message; the usual causes are no `ANTHROPIC_API_KEY`, no `tmux`, no TypeScript compiler, or a harness home that is a symlink, not yours, or open to group or others: fix it with `chmod 700 <home>`). Do not work around a missing precondition by skipping the stage.
 
 | The mod... | Run | Why |
 | --- | --- | --- |
-| only changes behavior (rewrites prompts, tool calls, system prompt, plays sound) | `validate,test,headless` | no screen involved |
-| sets a status line, toast, band, pane, or any UI | `validate,test,headless,interactive --expect <text it shows>` | headless runs draw nothing |
+| only changes behavior (rewrites prompts, tool calls, system prompt, plays sound) | `validate,test,headless,typecheck` | no screen involved |
+| sets a status line or toast | `validate,test,headless,typecheck,interactive --expect <text it shows>` | headless runs draw nothing |
+| draws a pane, band, or other element that needs input to appear | `validate,test,headless,typecheck,interactive --expect <text it shows> --script <file>` | the element exists only after keys are sent |
 
 The interactive status line shows the plugin name in front of the mod's own text. Pass the part the mod sets.
+
+`typecheck` runs a TypeScript compiler over the run copy of the mod using the declarations the engine wrote there, so it must follow `headless` in the same run; `--stages typecheck,interactive` fails. It writes `typecheck.log`. With no compiler (`tsc`, `bunx tsc`, or `npx --no-install tsc`) the harness exits `2` before starting any child. It is never skipped. A type error fails the run even when every other stage passed.
+
+### Scripted interactive runs
+
+`--script FILE` drives the interactive session after `--expect` has appeared, one step per line:
+
+```text
+type /<command that opens the pane>
+key Enter
+expect <pane header text>
+key Down
+expect <pane header text>
+```
+
+- `type TEXT` sends literal text, `key NAME...` sends tmux key names (`Enter`, `Down`, `Escape`), and `expect TEXT` waits for text on screen within `--timeout`, which bounds each wait separately.
+- The harness saves `screen-NN.txt` after each step and fails at the first `expect` that does not appear, naming the step.
+- A script needs `--expect` as its readiness step and the `interactive` stage; without either the harness exits `2`. Blank lines and lines starting with `#` are ignored.
+- `--cols` and `--rows` set the terminal size (default 120 by 40). Some elements draw only above a minimum width.
+- A step that presses Enter on a row can have real effects, such as opening a browser. Write scripts so they do not.
 
 ## Definition of done
 
@@ -53,10 +74,12 @@ Report a mod as working only when:
 
 1. `validate` passed.
 2. A `*.test.ts` asserting the requested behavior exists and `test` passed. A test that cannot fail when the behavior changes does not count; change the behavior once to see it fail.
-3. `headless` passed (marker written, module listed in the debug log).
-4. If the mod draws anything: `interactive` passed with the expected text in the capture.
+3. `headless` passed (marker written, module listed in the debug log, child exited zero).
+4. `typecheck` passed. If it fails, fix the error and rerun; a mod with a type error is not working, whatever the other stages said.
+5. If the mod draws anything: `interactive` passed, including proof of load, with the expected text in the capture.
+6. If the mod draws a pane, band, or other element that needs input to appear: the `interactive` run was scripted to open it, and the saved captures show it drawn and the interaction applied.
 
-Never describe a stage you did not run as passed. A headless pass says nothing about UI.
+Never describe a stage you did not run as passed. A headless pass says nothing about UI. An interactive pass that matched only the mod's status line says nothing about a pane the mod opens on a command or key.
 
 ## Report
 
@@ -66,12 +89,18 @@ End with this, one line per stage, using only `ran and passed`, `ran and FAILED`
 validate     <status> <evidence path>
 test         <status> <evidence path>
 headless     <status> <evidence path>
+typecheck    <status> <evidence path>
 interactive  <status> <evidence path>
+ui evidence  status line only | drawn and driven | not applicable (reason)
 Mod: <absolute path>
 Load it:  claude --plugin-dir <absolute path>
 ```
 
-A UI mod without a passing interactive stage is reported as `UI unverified`.
+A UI mod without a passing interactive stage is reported as `UI unverified`. A pane or other input-driven element whose interactive stage matched only the status line is reported as `pane unverified`, with `ui evidence  status line only`. Use `drawn and driven` only when a scripted run opened the element and the per-step captures show it and the input's effect.
+
+## Color and background claims
+
+A plain-text capture (`screen.txt`, `screen-NN.txt`) carries no color. Any statement about a background, foreground, or fill color cites `screen.ansi` (the capture with color escape sequences) or `stream.raw` (the child's raw terminal output). Do not answer a color question from the plain-text capture.
 
 ## When a stage keeps failing
 

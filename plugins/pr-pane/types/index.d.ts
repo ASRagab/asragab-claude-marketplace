@@ -1,6 +1,8 @@
-export type PrState = 'draft' | 'changes requested' | 'approved' | 'ready for review'
+export type PrState = 'draft' | 'has feedback' | 'approved' | 'needs review'
 
-export type Pr = { repo: string; number: number; title: string; url: string; state: PrState }
+export type SortBy = 'repo' | 'status' | 'date'
+
+export type Pr = { repo: string; number: number; title: string; url: string; state: PrState; updatedAt: string }
 
 export type View = {
   login?: string
@@ -12,6 +14,6 @@ export type View = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'pr-pane': { view: View }
+    'pr-pane': { view: View; visible: boolean; sort: SortBy; page: number }
   }
 }

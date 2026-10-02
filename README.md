@@ -1,6 +1,6 @@
 # asragab-claude-marketplace
 
-A Claude Code plugin marketplace containing plugins for session search/analytics, skill evaluation, Claude Code mod development, and a PR pane mod.
+A Claude Code plugin marketplace containing plugins for session search/analytics, skill evaluation, Claude Code mod development, and a PR picker mod.
 
 ## Plugins
 
@@ -9,7 +9,7 @@ A Claude Code plugin marketplace containing plugins for session search/analytics
 | [cass](#cass) | 0.3.0 | Cross-agent session search, context, analytics, export, learnings, and **session resume** powered by CASS CLI |
 | [skill-eval](#skill-eval) | 1.0.0 | Automated skill/prompt/tool evaluation and improvement via session log analysis and autoresearch optimization |
 | [mod-forge](#mod-forge) | 0.2.0 | Build and verify Claude Code mods in isolated child processes, never in the live session (Claude Code 2.1.287+) |
-| [pr-pane](#pr-pane) | 0.1.0 | `/prs` toggles a pane of your open GitHub PRs with review state; arrows and Enter open one in the browser (Claude Code 2.1.287+, needs `gh`) |
+| [pr-pane](#pr-pane) | 0.2.0 | `/prs` toggles a band above the prompt with your open GitHub PRs and review state; arrows and Enter open one in the browser (Claude Code 2.1.287+, needs `gh`) |
 
 ## Installation
 
@@ -200,9 +200,13 @@ bash plugins/mod-forge/tests/live.test.sh
 
 A Claude Code mod for keeping your open pull requests one keystroke away. **Claude Code only**, version 2.1.287 or later.
 
-`/prs` toggles a pane listing every open PR you authored, across repositories. Each row starts with a state glyph, and the header legend counts them: `✗` changes requested, `✓` approved, `●` ready for review, `○` draft. Rows are grouped in that order. Arrow keys move the cursor and Enter opens the PR in your browser (`open` on macOS, `xdg-open` on Linux). Esc returns to the prompt.
+`/prs` toggles a band above the prompt listing your open PRs across repositories. The whole PR description carries its status color: `✗` unresolved comments or requested changes in red, `✓` approved in blue, `●` needs review in orange, and `○` draft in dim text. Draft takes precedence; unresolved review threads take precedence over approval. Resolved threads and historical comments do not make a PR red.
 
-It needs no configuration. The GitHub user is whoever `gh` is logged in as, the list refreshes every 60 seconds and when you open the pane, and the status line shows the open PR count. If `gh` is missing or logged out, the pane says to run `gh auth login`. The list shows up to 100 PRs; the header shows the true total when there are more.
+Press Ctrl+X, then Tab to focus the band; arrows or Tab move between controls and Enter opens a PR in your browser (`open` on macOS, `xdg-open` on Linux). While the band has focus, `r` sorts by repository, `s` by status, and `d` by last-updated date. One sort mode is active at a time; repository/status groups use newest-updated first. The default status order is feedback, approved, needs review, draft. Up to eight rows appear per page; `p`/`n` switch pages. If other band output makes the drawing overflow, arrows scroll and Tab still moves focus. Esc returns to the prompt and leaves the band visible; `/prs` hides it. The band sets no background color and yields while a survey is active.
+
+Dim horizontal rules above and below the PR content visually separate it while preserving the default background. Smaller bands reduce the page size to leave room for the rules.
+
+It needs no configuration. The GitHub user is whoever `gh` is logged in as. Background polling runs at startup, every 60 seconds, and when you show the band; updates normally appear within a minute plus API latency. The header shows the open PR count and last successful refresh time. A failed refresh keeps the last good list and shows the error in the band. If `gh` is missing or logged out, it says to run `gh auth login`. The list includes the 100 most recently updated PRs; the header shows the true total when there are more.
 
 ```bash
 # Run the mod's tests (no network, no API key)

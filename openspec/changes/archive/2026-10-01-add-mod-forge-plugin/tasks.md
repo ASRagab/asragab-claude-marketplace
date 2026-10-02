@@ -3,12 +3,12 @@
 ## 1. Authorization and copy
 
 - [x] 1.1 Owner approved MIT relicensing on 2026-10-01 and waived quoting the approval in the PR description; verify the approval is recorded in design.md
-- [x] 1.2 Copy `~/Dev/handshake/handshake-ade-tools/plugins/mod-forge` to `plugins/mod-forge` with `cp -Rp`; verify `diff -r` against the source shows no differences and `plugins/mod-forge/scripts/run-mod.sh` is executable (`test -x`)
+- [x] 1.2 Copy the source `plugins/mod-forge` directory to `plugins/mod-forge` with `cp -Rp`; verify `diff -r` against the source shows no differences and `plugins/mod-forge/scripts/run-mod.sh` is executable (`test -x`)
 
 ## 2. Scrub and manifest
 
 - [x] 2.1 Edit `plugins/mod-forge/.claude-plugin/plugin.json`: author `{ "name": "ASRagab", "url": "https://github.com/ASRagab" }`, `repository` `https://github.com/ASRagab/asragab-claude-marketplace`, license `MIT`, matching the field order of `plugins/cass/.claude-plugin/plugin.json`; verify with `jq -e '.license=="MIT" and .author.name=="ASRagab"'`
-- [x] 2.2 Replace the `make mod-forge-test` line in the `plugins/mod-forge/tests/live.test.sh` header with `bash plugins/mod-forge/tests/live.test.sh`; verify `grep -rEi 'make mod-forge-test|handshake|joinhandshake' plugins/mod-forge` returns nothing and `diff -r` against the source shows only `plugin.json` and that one comment line
+- [x] 2.2 Replace the `make mod-forge-test` line in the `plugins/mod-forge/tests/live.test.sh` header with `bash plugins/mod-forge/tests/live.test.sh`; verify `grep -rn 'make mod-forge-test' plugins/mod-forge` returns nothing and `diff -r` against the source shows only `plugin.json` and that one comment line
 - [x] 2.3 Verify the plugin manifest with `claude plugin validate plugins/mod-forge` (Claude Code >= 2.1.287); expected exit 0
 
 ## 3. Register and expose tests

@@ -2,12 +2,12 @@
 
 ## Why
 
-The `mod-forge` plugin lets an agent build and verify Claude Code mods in isolated child processes, never in the live session. It lives only inside the `handshake-ade-tools` marketplace, so it cannot be installed in other environments. Moving it into this marketplace makes it installable with `claude plugin install mod-forge` anywhere this marketplace is added.
+The `mod-forge` plugin lets an agent build and verify Claude Code mods in isolated child processes, never in the live session. It lives only inside a private marketplace, so it cannot be installed in other environments. Moving it into this marketplace makes it installable with `claude plugin install mod-forge` anywhere this marketplace is added.
 
 ## What Changes
 
-- Copy the 11 files of `handshake-ade-tools/plugins/mod-forge` to `plugins/mod-forge/` in this repository, preserving the executable bit on `scripts/run-mod.sh`. Scripts, skill text, fixture, and test logic are unchanged.
-- Change `plugins/mod-forge/.claude-plugin/plugin.json` author from `Handshake` to `ASRagab` and license from `Private` to `MIT`, matching `cass` and `skill-eval`. Add `repository` and `url` fields to match the sibling manifests. The code was written under a `Private` license at Handshake and this repository is public; the owner approved the relicense (see design.md).
+- Copy the 11 files of the source `plugins/mod-forge` to `plugins/mod-forge/` in this repository, preserving the executable bit on `scripts/run-mod.sh`. Scripts, skill text, fixture, and test logic are unchanged.
+- Change `plugins/mod-forge/.claude-plugin/plugin.json` author to `ASRagab` and license from `Private` to `MIT`, matching `cass` and `skill-eval`. Add `repository` and `url` fields to match the sibling manifests. The source is licensed `Private` and this repository is public; the owner approved the relicense (see design.md).
 - Replace the `make mod-forge-test` reference in the `tests/live.test.sh` header comment with the direct `bash plugins/mod-forge/tests/live.test.sh` invocation, since this repository has no Makefile.
 - Register `mod-forge` in `.claude-plugin/marketplace.json`.
 - Add a `mod-forge` row to the README plugin table, an install line, and a `mod-forge` section that points to the plugin README and states the Claude Code >= 2.1.287 requirement.
@@ -32,4 +32,4 @@ The `mod-forge` plugin lets an agent build and verify Claude Code mods in isolat
 - Edited: `.claude-plugin/marketplace.json`, `README.md`, `package.json`.
 - Runtime requirements of the plugin (unchanged): Claude Code >= 2.1.287, `jq`, and for live stages `ANTHROPIC_API_KEY` and `tmux`.
 - Live test makes real model calls (about $0.01 to $0.03 per headless run) when run.
-- The source plugin in `handshake-ade-tools` is left untouched. Two copies will exist; the new copy is not kept in sync automatically.
+- The source plugin is left untouched. Two copies will exist; the new copy is not kept in sync automatically.

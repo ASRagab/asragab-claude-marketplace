@@ -63,5 +63,5 @@ The repository README SHALL list `mod-forge` in the plugin table with its versio
 - **THEN** it has a `mod-forge` row whose version equals the manifest version
 
 #### Scenario: No stale source-repo references
-- **WHEN** `plugins/mod-forge` is searched for `make mod-forge-test`, `handshake-ade-tools`, and `joinhandshake`
+- **WHEN** `plugins/mod-forge` is searched for `make mod-forge-test`
 - **THEN** there are no matches

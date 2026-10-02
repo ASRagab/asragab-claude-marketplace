@@ -2,7 +2,7 @@
 
 ## Context
 
-The source plugin is `~/Dev/handshake/handshake-ade-tools/plugins/mod-forge` (11 files, latest commits `469c484` and `55ef1f6`). It is self-contained: scripts resolve their own directory with `BASH_SOURCE`, and the skill refers to `${CLAUDE_PLUGIN_ROOT}`. The only coupling to its host repository is in the two test scripts, which set `REPO=$PLUGIN/../..` and compare `git -C "$REPO" status --short` before and after a run to prove the run left the repository untouched. Here `plugins/mod-forge/../..` is this repository's root, which is a git repository, so that check keeps its meaning.
+The source plugin is `plugins/mod-forge` in another marketplace repository (11 files). It is self-contained: scripts resolve their own directory with `BASH_SOURCE`, and the skill refers to `${CLAUDE_PLUGIN_ROOT}`. The only coupling to its host repository is in the two test scripts, which set `REPO=$PLUGIN/../..` and compare `git -C "$REPO" status --short` before and after a run to prove the run left the repository untouched. Here `plugins/mod-forge/../..` is this repository's root, which is a git repository, so that check keeps its meaning.
 
 This repository uses OpenSpec, `bun test` for the skill-eval tests, no Makefile, MIT-licensed plugin manifests with `repository` and `author.url` fields, and is public on GitHub. See proposal.md for motivation.
 
@@ -14,7 +14,7 @@ This repository uses OpenSpec, `bun test` for the skill-eval tests, no Makefile,
 
 **Non-Goals:**
 - Keeping the two copies in sync after this change.
-- Removing the plugin from `handshake-ade-tools`.
+- Removing the plugin from the source repository.
 - Teaching any validator about the `modules` form of `hooks.json`.
 - Porting the tests to `bun test`.
 
@@ -28,7 +28,7 @@ This repository uses OpenSpec, `bun test` for the skill-eval tests, no Makefile,
 
 **Keep the bash tests as bash.** Both tests exercise shell scripts through stubs and real `claude` children. Wrapping them in `bun test` would hide failures behind a second runner. `package.json` gets one script, `test:mod-forge`, for the offline test only. The live test is excluded from every script because it spends money and needs a key; the README documents the command. No env gate is added, per the repository owner's rule that live tests make real calls.
 
-**Relicense to MIT.** The source code is licensed `Private` and was written at Handshake. This repository is public and its manifests say `MIT`. The repository owner approved publishing `mod-forge` here under MIT on 2026-10-01. The approval covers committing this change folder, which names the internal repository and its commit hashes.
+**Relicense to MIT.** The source plugin is licensed `Private`. This repository is public and its manifests say `MIT`. The repository owner approved publishing `mod-forge` here under MIT on 2026-10-01.
 
 ## Risks / Trade-offs
 

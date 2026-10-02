@@ -1,0 +1,5 @@
+{
+  "name": "type-error-probe",
+  "version": "0.1.0",
+  "description": "Throwaway probe whose only defect is a type error, to show the typecheck stage catches what the other stages accept"
+}

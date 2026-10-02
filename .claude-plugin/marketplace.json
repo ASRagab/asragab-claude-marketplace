@@ -22,7 +22,7 @@
       "name": "mod-forge",
       "source": "./plugins/mod-forge",
       "description": "Build and verify Claude Code mods in isolated child processes, never in the live session. Claude Code 2.1.287 or later only.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "name": "pr-pane",

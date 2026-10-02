@@ -8,7 +8,7 @@ A Claude Code plugin marketplace containing plugins for session search/analytics
 |--------|---------|-------------|
 | [cass](#cass) | 0.3.0 | Cross-agent session search, context, analytics, export, learnings, and **session resume** powered by CASS CLI |
 | [skill-eval](#skill-eval) | 1.0.0 | Automated skill/prompt/tool evaluation and improvement via session log analysis and autoresearch optimization |
-| [mod-forge](#mod-forge) | 0.1.0 | Build and verify Claude Code mods in isolated child processes, never in the live session (Claude Code 2.1.287+) |
+| [mod-forge](#mod-forge) | 0.2.0 | Build and verify Claude Code mods in isolated child processes, never in the live session (Claude Code 2.1.287+) |
 | [pr-pane](#pr-pane) | 0.1.0 | `/prs` toggles a pane of your open GitHub PRs with review state; arrows and Enter open one in the browser (Claude Code 2.1.287+, needs `gh`) |
 
 ## Installation
@@ -181,9 +181,9 @@ bun scripts/autoresearch-loop.ts -t targets.jsonl --max-rounds 10
 
 Build and verify Claude Code mods without touching the session you are working in. **Claude Code only**, version 2.1.287 or later.
 
-The `build-claude-mod` skill sends an agent through `scripts/run-mod.sh`, which runs a mod through four fail-fast stages (`validate`, `test`, `headless`, `interactive`) in separate processes under a harness-owned `CLAUDE_CONFIG_DIR`. See [plugins/mod-forge/README.md](plugins/mod-forge/README.md) for stages, evidence files, and exit codes.
+The `build-claude-mod` skill sends an agent through `scripts/run-mod.sh`, which runs a mod through five fail-fast stages (`validate`, `test`, `headless`, `typecheck`, `interactive`) in separate processes under a harness-owned `CLAUDE_CONFIG_DIR`. See [plugins/mod-forge/README.md](plugins/mod-forge/README.md) for stages, evidence files, and exit codes.
 
-Requires `jq`. Live stages also need `ANTHROPIC_API_KEY`, and the interactive stage needs `tmux`.
+Requires `jq`. Live stages also need `ANTHROPIC_API_KEY`, the interactive stage needs `tmux`, and the type check needs a TypeScript compiler.
 
 ```bash
 # Offline test: no model calls, no API key

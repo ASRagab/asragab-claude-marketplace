@@ -1,6 +1,6 @@
 {
   "name": "pr-pane",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Toggle your open GitHub PRs above the prompt; focus with Ctrl+X then Tab, then use arrows and Enter to open one in the browser.",
   "author": {
     "name": "ASRagab",

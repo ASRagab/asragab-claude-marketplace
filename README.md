@@ -9,7 +9,7 @@ A Claude Code plugin marketplace containing plugins for session search/analytics
 | [cass](#cass) | 0.3.0 | Cross-agent session search, context, analytics, export, learnings, and **session resume** powered by CASS CLI |
 | [skill-eval](#skill-eval) | 1.0.0 | Automated skill/prompt/tool evaluation and improvement via session log analysis and autoresearch optimization |
 | [mod-forge](#mod-forge) | 0.1.0 | Build and verify Claude Code mods in isolated child processes, never in the live session (Claude Code 2.1.287+) |
-| [pr-pane](#pr-pane) | 0.1.0 | `/prs` toggles a band above the prompt with your open GitHub PRs and review state; arrows and Enter open one in the browser (Claude Code 2.1.287+, needs `gh`) |
+| [pr-pane](#pr-pane) | 0.2.0 | `/prs` toggles a band above the prompt with your open GitHub PRs and review state; arrows and Enter open one in the browser (Claude Code 2.1.287+, needs `gh`) |
 
 ## Installation
 
